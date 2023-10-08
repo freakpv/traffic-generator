@@ -9,6 +9,7 @@ project(traffic-generator CXX)
 #  GIT_TAG v23.07)
 #FetchContent_MakeAvailable(libdpdk)
 
+find_package(PkgConfig REQUIRED)
 include(ExternalProject)
 
 set(3RD_PARTY_PREFIX_DIR "${CMAKE_SOURCE_DIR}/3rdparty")
@@ -18,7 +19,9 @@ set(3RD_PARTY_TMP_DIR "${3RD_PARTY_PREFIX_DIR}/tmp")
 set(DPDK_PREFIX_DIR "${3RD_PARTY_PREFIX_DIR}/dpdk")
 set(DPDK_BUILD_DIR "${DPDK_PREFIX_DIR}/build")
 set(DPDK_TARGET_DIR "${DPDK_PREFIX_DIR}/target")
- 
+
+set(ENV{PKG_CONFIG_PATH} "${DPDK_TARGET_DIR}/lib/x86_64-linux-gnu/pkgconfig")
+
 ExternalProject_Add(
     dpdk
 
@@ -57,12 +60,17 @@ ExternalProject_Add_Step(
     DEPENDEES install
 )
 
+pkg_search_module(LIB_DPDK REQUIRED libdpdk)
+
 add_executable(traffic-generator
     main.cpp)
 
 add_dependencies(traffic-generator dpdk)
 
 add_compile_options(-Wall -Wextra -std=c++23)
+
+target_compile_options(traffic-generator LIBDPDK_CFLAGS_OTHER)
+target_link_libraries(traffic-generator LIBDPDK_LDFLAGS)
 
 target_precompile_headers(traffic-generator
     PUBLIC precompiled.h)
