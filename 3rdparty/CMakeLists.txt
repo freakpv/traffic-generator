@@ -62,8 +62,6 @@ ExternalProject_Add_Step(
 
 ################################################################################
 # Boost Libraries
-#  GIT_REPOSITORY https://github.com/boostorg/boost.git
-#  GIT_TAG boost-1.83.0
 
 set(BOOST_ARCHIVE "boost_1_83_0.tar.bz2")
 set(BOOST_PREFIX_DIR "${3RD_PARTY_PREFIX_DIR}/boost")
