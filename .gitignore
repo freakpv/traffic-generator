@@ -1,3 +1,5 @@
 build
-3rdparty
+3rdparty/*
 *.swp
+
+!3rdparty/CMakeLists.txt
