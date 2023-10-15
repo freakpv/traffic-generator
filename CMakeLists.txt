@@ -26,7 +26,7 @@ add_compile_options(-Wall -Wextra -std=c++23)
 set(ENV{PKG_CONFIG_PATH} "${DPDK_TARGET_DIR}/lib/x86_64-linux-gnu/pkgconfig/")
 pkg_search_module(LIBDPDK REQUIRED libdpdk)
 target_compile_options(traffic-generator PRIVATE ${LIBDPDK_CFLAGS})
-target_link_options(traffic-generator PRIVATE ${LIBDPDK_LDFLAGS})
+target_link_libraries(traffic-generator PRIVATE ${LIBDPDK_LDFLAGS} -lnuma)
 
 target_include_directories(traffic-generator PRIVATE ${BOOST_INCLUDE_DIR})
 
