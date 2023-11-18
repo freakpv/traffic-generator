@@ -108,3 +108,31 @@ ExternalProject_Add(
 
     INSTALL_COMMAND echo "Installation done at ${BOOST_TARGET_DIR}"
 )
+
+################################################################################
+# FMT Library
+
+set(FMT_PREFIX_DIR "${3RD_PARTY_PREFIX_DIR}/fmt")
+set(FMT_BUILD_DIR "${FMT_PREFIX_DIR}/build")
+ExternalProject_Add(
+    fmt
+
+    GIT_REPOSITORY "https://github.com/fmtlib/fmt"
+    GIT_TAG "10.1.1"
+
+    PREFIX ${3RD_PARTY_PREFIX_DIR}
+    TMP_DIR ${3RD_PARTY_TMP_DIR}
+    DOWNLOAD_DIR ${3RD_PARTY_DOWNLOAD_DIR}
+    SOURCE_DIR ${FMT_PREFIX_DIR}
+    STAMP_DIR ${FMT_PREFIX_DIR}-stamp
+    #BINARY_DIR ${FMT_PREFIX_DIR}-build
+
+    CONFIGURE_COMMAND 
+        mkdir -p ${FMT_BUILD_DIR} && cd ${FMT_BUILD_DIR} && cmake ../
+
+    BUILD_ALWAYS TRUE
+    BUILD_IN_SOURCE TRUE
+    BUILD_COMMAND cd ${FMT_BUILD_DIR} && make
+
+    INSTALL_COMMAND echo "Skip installation of the fmt library"
+)
