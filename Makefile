@@ -1,6 +1,6 @@
 
 all:
-	cd ./build && ninja --verbose
+	cd ./build && touch version_info.cpp 2> /dev/null && ninja --verbose
 
 clean:
 	cd ./build && ninja clean
