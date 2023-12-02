@@ -37,54 +37,41 @@ remove_mnt_huge()
 }
 
 #
-# Unloads igb_uio.ko.
+# Removes all reserved hugepages.
 #
-remove_igb_uio_module()
+clear_non_numa_huge_pages()
 {
-	echo "Unloading any existing DPDK UIO module"
-	/sbin/lsmod | grep -s igb_uio > /dev/null
-	if [ $? -eq 0 ] ; then
-		sudo /sbin/rmmod igb_uio
-	fi
+	echo > .echo_tmp
+	echo "echo 0 > /sys/kernel/mm/hugepages/hugepages-${HUGEPGSZ}/nr_hugepages" > .echo_tmp
+
+	echo "Removing currently reserved hugepages"
+	sudo sh .echo_tmp
+	rm -f .echo_tmp
+
+	remove_mnt_huge
 }
 
 #
-# Loads new igb_uio.ko (and uio module if needed).
+# Creates hugepages.
 #
-load_igb_uio_module()
+set_non_numa_huge_pages()
 {
-	if [ ! -f igb_uio.ko ];then
-		echo "## ERROR: Target does not have the DPDK UIO Kernel Module."
-		echo "       To fix, please try to rebuild target."
-		return
-	fi
+	clear_non_numa_huge_pages
 
-	remove_igb_uio_module
+	echo > .echo_tmp
+	echo "echo $PAGES > /sys/kernel/mm/hugepages/hugepages-${HUGEPGSZ}/nr_hugepages" > .echo_tmp
 
-	/sbin/lsmod | grep -s uio > /dev/null
-	if [ $? -ne 0 ] ; then
-		modinfo uio > /dev/null
-		if [ $? -eq 0 ]; then
-			echo "Loading uio module"
-			sudo /sbin/modprobe uio
-		fi
-	fi
+	echo "Reserving hugepages"
+	sudo sh .echo_tmp
+	rm -f .echo_tmp
 
-	# UIO may be compiled into kernel, so it may not be an error if it can't
-	# be loaded.
-
-	echo "Loading DPDK UIO module"
-	sudo /sbin/insmod igb_uio.ko
-	if [ $? -ne 0 ] ; then
-		echo "## ERROR: Could not load igb_uio.ko."
-		quit
-	fi
+	create_mnt_huge
 }
 
 #
 # Removes all reserved hugepages.
 #
-clear_huge_pages()
+clear_numa_huge_pages()
 {
 	echo > .echo_tmp
 	for d in /sys/devices/system/node/node? ; do
@@ -98,27 +85,11 @@ clear_huge_pages()
 }
 
 #
-# Creates hugepages.
-#
-set_non_numa_pages()
-{
-	clear_huge_pages
-
-	echo "echo $PAGES > /sys/kernel/mm/hugepages/hugepages-${HUGEPGSZ}/nr_hugepages" > .echo_tmp
-
-	echo "Reserving hugepages"
-	sudo sh .echo_tmp
-	rm -f .echo_tmp
-
-	create_mnt_huge
-}
-
-#
 # Creates hugepages on specific NUMA nodes.
 #
-set_numa_pages()
+set_numa_huge_pages()
 {
-	clear_huge_pages
+	clear_numa_huge_pages
 
 	echo > .echo_tmp
 	for d in /sys/devices/system/node/node? ; do
@@ -150,22 +121,6 @@ show_devices()
 	./dpdk-devbind.py --status
 }
 
-#
-# Uses dpdk-devbind.py to move devices to work with igb_uio
-#
-bind_devices_to_igb_uio()
-{
-	if [ -d /sys/module/igb_uio ]; then
-        for pci in "${PCI_PATHS[@]}";
-            do sudo ./dpdk-devbind.py -b igb_uio $pci && echo "Bound device $pci";
-        done
-		./dpdk-devbind.py --status
-	else
-		echo "# Please load the 'igb_uio' kernel module before querying or "
-		echo "# adjusting device bindings"
-	fi
-}
-
 bind_devices_to_vfio_pci()
 {
 	# This setting/line taints the kernel and may not be needed 
@@ -191,17 +146,14 @@ unbind_devices()
 ################################################################################
 
 if [ "$1" = "setup" ]; then
-    set_numa_pages
-    #load_igb_uio_module
-    #bind_devices_to_igb_uio
+    set_non_numa_huge_pages
     bind_devices_to_vfio_pci
 elif [ "$1" = "status" ]; then
     grep_meminfo
     show_devices
 elif [ "$1" = "destroy" ]; then
     unbind_devices
-    #remove_igb_uio_module
-    clear_huge_pages
+    clear_non_numa_huge_pages
 else
     echo "Unsupported command: $1"
 fi
