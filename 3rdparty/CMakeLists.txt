@@ -43,6 +43,8 @@ ExternalProject_Add(
         --default-library static
         --warnlevel 2
         -Denable_kmods=false
+        -Denable_apps=dumpcap
+        -Denable_drivers=net/bonding,net/e1000,net/i40e,net/ixgbe
         -Dmachine=${CPU_TYPE}
 
     BUILD_ALWAYS TRUE
