@@ -1,12 +1,23 @@
 #include "aliases.h"
 #include "version_info.h"
 
+#include "put/stacktrace.h"
 #include "put/throw.h"
 
 template <>
 struct fmt::formatter<bpo::options_description> : fmt::ostream_formatter
 {
 };
+
+[[gnu::noinline]] void best()
+{
+    while (true) { ::sleep(2); }
+}
+
+[[gnu::noinline]] void test()
+{
+    best();
+}
 
 int main(int argc, char** argv)
 {
@@ -15,7 +26,7 @@ int main(int argc, char** argv)
     // clang-format off
     opts.add_options()
         ("help,H", "This help message")
-        ("dir,D", bpo::value<stdfs::path>(), "Path to the PCAP directory")
+        ("config,C", bpo::value<stdfs::path>(), "Path to configuration file")
         ("version,V", "Version and other info about the binary");
     // clang-format on
 
@@ -33,8 +44,13 @@ int main(int argc, char** argv)
                        "Git hash: {}.\n",
                        build_datetime, build_githash);
         } else if (vm.count("config")) {
-            // TODO: Setup stacktrace dump
-            // TODO: Start the generator
+            // Redirect the crash information to the stderr
+            if (int err = put::dump_stacktrace_on_fatal_signal(STDERR_FILENO);
+                err != 0) {
+                put::throw_system_error(
+                    err, "Unable to setup the stacktrace dumper");
+            }
+            test();
         } else {
             put::throw_runtime_error("No options provided.\n{}", opts);
         }

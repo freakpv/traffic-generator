@@ -24,24 +24,34 @@ execute_process(
 
 add_custom_target(generate-version-info 
     ALL "${CMAKE_SOURCE_DIR}/generate_version_info.sh"
-    BYPRODUCTS "version-info.cpp"
+    BYPRODUCTS "version-info.cxx"
 )
 
+file(GLOB PROJECT_SOURCES
+     "*.cpp"
+     "put/*.cpp"
+)
 
 add_executable(traffic-generator
-    main.cpp
-    version_info.cpp
+    ${PROJECT_SOURCES}
+    version_info.cxx
 )
 
 add_dependencies(traffic-generator
     generate-version-info
 )
 
-add_compile_options(-Wall -Wextra -Werror -std=c++23)
-
 set(ENV{PKG_CONFIG_PATH} "${DPDK_TARGET_DIR}/lib/x86_64-linux-gnu/pkgconfig/")
 pkg_search_module(LIBDPDK REQUIRED libdpdk)
-target_compile_options(traffic-generator PRIVATE ${LIBDPDK_CFLAGS})
+
+target_compile_options(traffic-generator 
+    PRIVATE -Wall -Wextra -Werror -O3 -std=c++23
+    PRIVATE ${LIBDPDK_CFLAGS}
+)
+
+target_link_options(traffic-generator 
+    PRIVATE -static-libstdc++ -static-libgcc -pthread -rdynamic
+)
 
 target_include_directories(traffic-generator 
     PRIVATE ${BOOST_INCLUDE_DIR}
