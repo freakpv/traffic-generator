@@ -15,6 +15,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // DPDK headers
+#include <rte_ether.h>
 #include <rte_launch.h>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -22,13 +23,16 @@
 #include <atomic>
 #include <exception>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
+#include <string_view>
 
 ////////////////////////////////////////////////////////////////////////////////
 // boost headers
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <boost/spirit/home/x3.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>
 
