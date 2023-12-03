@@ -27,8 +27,9 @@ add_custom_target(generate-version-info
     BYPRODUCTS "version-info.cxx"
 )
 
-file(GLOB PROJECT_SOURCES
+file(GLOB PROJECT_SOURCES CONFIGURE_DEPENDS
      "*.cpp"
+     "cfg/*.cpp"
      "put/*.cpp"
 )
 
@@ -56,6 +57,7 @@ target_link_options(traffic-generator
 target_include_directories(traffic-generator 
     PRIVATE ${BOOST_INCLUDE_DIR}
     PRIVATE ${FMT_INCLUDE_DIR}
+    PRIVATE ${CMAKE_SOURCE_DIR}
 )
 
 target_link_directories(traffic-generator 

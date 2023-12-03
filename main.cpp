@@ -9,16 +9,6 @@ struct fmt::formatter<bpo::options_description> : fmt::ostream_formatter
 {
 };
 
-[[gnu::noinline]] void best()
-{
-    while (true) { ::sleep(2); }
-}
-
-[[gnu::noinline]] void test()
-{
-    best();
-}
-
 int main(int argc, char** argv)
 {
     // The secondary options are given only to the secondary child processes.
@@ -50,7 +40,7 @@ int main(int argc, char** argv)
                 put::throw_system_error(
                     err, "Unable to setup the stacktrace dumper");
             }
-            test();
+            // TODO
         } else {
             put::throw_runtime_error("No options provided.\n{}", opts);
         }
