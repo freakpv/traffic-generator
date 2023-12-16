@@ -9,6 +9,8 @@ namespace cfg
 // The class holds the settings coming from the configuration file
 class config
 {
+    friend class fmt::formatter<config>;
+
     struct opts
     {
 #define XXX(type, name) type name##_ = {};
@@ -40,10 +42,15 @@ public:
     const type& name() const { return opts_.name##_; }
     TGN_CONFIG_SETTINGS(XXX)
 #undef XXX
-
-    friend fmt::format_context::iterator
-    tgn_format_to(fmt::format_context::iterator, const config&) noexcept;
 };
 
 #undef TGN_CONFIG_SETTINGS
 } // namespace cfg
+////////////////////////////////////////////////////////////////////////////////
+template <>
+struct fmt::formatter<cfg::config>
+{
+    constexpr auto parse(auto& ctx) const noexcept { return ctx.begin(); }
+    format_context::iterator format(const cfg::config&,
+                                    format_context&) const noexcept;
+};

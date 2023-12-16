@@ -69,13 +69,16 @@ config::config(const stdfs::path& config_path)
 
 config::~config() noexcept = default;
 
-fmt::format_context::iterator tgn_format_to(fmt::format_context::iterator it,
-                                            const config& cfg) noexcept
+} // namespace cfg
+////////////////////////////////////////////////////////////////////////////////
+fmt::format_context::iterator
+fmt::formatter<cfg::config>::format(const cfg::config& arg,
+                                    fmt::format_context& ctx) const noexcept
 {
-    cfg.opts_.visit([&it]<typename V>(std::string_view name, const V& val) {
+    auto it = ctx.out();
+    arg.opts_.visit([&it]<typename V>(std::string_view name, const V& val) {
         it = fmt::format_to(it, "\n\t{} = {}", name, val);
     });
     return it;
 }
 
-} // namespace cfg
