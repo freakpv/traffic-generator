@@ -12,6 +12,7 @@
 #include <string.h>
 #include <ucontext.h>
 #include <unistd.h>
+#include <sys/resource.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // DPDK headers
