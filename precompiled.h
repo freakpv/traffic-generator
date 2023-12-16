@@ -24,8 +24,11 @@
 #include <exception>
 #include <filesystem>
 #include <optional>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
+
+#include <experimental/scope>
 
 ////////////////////////////////////////////////////////////////////////////////
 // boost headers
