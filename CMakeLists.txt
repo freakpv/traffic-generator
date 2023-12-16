@@ -13,14 +13,15 @@ set(FMT_TARGET_DIR "${3RD_PARTY_DIR}/fmt")
 set(FMT_INCLUDE_DIR "${FMT_TARGET_DIR}/include")
 set(FMT_LIB_DIR "${FMT_TARGET_DIR}/build")
 
-execute_process(
-    COMMAND ${CMAKE_COMMAND} ${3RD_PARTY_DIR}
-    WORKING_DIRECTORY ${3RD_PARTY_DIR}
-)
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --build ${3RD_PARTY_DIR}
-)
-
+if (DEFINED ENV{TGN_CHECK_3RD_PARTY})
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} ${3RD_PARTY_DIR}
+        WORKING_DIRECTORY ${3RD_PARTY_DIR}
+    )
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} --build ${3RD_PARTY_DIR}
+    )
+endif()
 
 add_custom_target(generate-version-info 
     ALL "${CMAKE_SOURCE_DIR}/generate_version_info.sh"
@@ -66,7 +67,7 @@ target_link_directories(traffic-generator
 )
 
 target_link_libraries(traffic-generator 
-    PRIVATE ${LIBDPDK_LDFLAGS} -lnuma
+    PRIVATE ${LIBDPDK_STATIC_LDFLAGS} -lnuma -lpcap -lelf
     PRIVATE -lboost_program_options
     PRIVATE -lfmt
 )
