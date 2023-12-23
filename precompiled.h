@@ -21,6 +21,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // c++ standard library headers
+#include <array>
 #include <atomic>
 #include <charconv>
 #include <exception>
@@ -35,6 +36,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // boost headers
+#include <boost/algorithm/string/split.hpp>
 #include <boost/outcome/result.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
