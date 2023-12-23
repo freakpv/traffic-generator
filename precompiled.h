@@ -22,10 +22,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 // c++ standard library headers
 #include <atomic>
+#include <charconv>
 #include <exception>
 #include <filesystem>
 #include <optional>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 
