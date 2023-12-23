@@ -27,17 +27,28 @@
 #include <charconv>
 #include <exception>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <memory>
 #include <span>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 
 #include <experimental/scope>
 
 ////////////////////////////////////////////////////////////////////////////////
 // boost headers
 #include <boost/algorithm/string/split.hpp>
+#include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/as_tuple.hpp>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/detached.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
 #include <boost/outcome/result.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>

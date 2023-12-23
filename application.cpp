@@ -11,15 +11,52 @@
 
 class application_impl
 {
-public:
-    explicit application_impl(const cfg::config&) {}
+    struct dpdk_eal
+    {
+        dpdk_eal(const cfg::config&);
+        ~dpdk_eal() noexcept;
 
-    void run() noexcept {}
+        dpdk_eal()                           = delete;
+        dpdk_eal(dpdk_eal&)                  = delete;
+        dpdk_eal(const dpdk_eal&)            = delete;
+        dpdk_eal& operator=(dpdk_eal&)       = delete;
+        dpdk_eal& operator=(const dpdk_eal&) = delete;
+    };
+
+    [[no_unique_address]] dpdk_eal eal_;
+
+    const stdfs::path working_dir_;
+    const std::array<uint16_t, 2> cpus_;
 
 public:
+    explicit application_impl(const cfg::config&);
+
+    void run() noexcept;
+
     static void ensure_enough_filedesc();
-    static void init_dpdk_eal(const cfg::config&);
+
+private:
+    void run_management_thread() noexcept;
+    void run_worker_thread() noexcept;
 };
+
+////////////////////////////////////////////////////////////////////////////////
+
+application_impl::application_impl(const cfg::config& cfg)
+: eal_(cfg), working_dir_(cfg.working_dir()), cpus_(cfg.cpus())
+{
+}
+
+void application_impl::run() noexcept
+{
+    if (const auto lcore = rte_lcore_id(); lcore == cpus_[0]) {
+        run_management_thread();
+    } else if (lcore == cpus_[1]) {
+        run_worker_thread();
+    } else {
+        TG_UNREACHABLE();
+    }
+}
 
 void application_impl::ensure_enough_filedesc()
 {
@@ -39,7 +76,7 @@ void application_impl::ensure_enough_filedesc()
     TGLOG_INFO("Set max file descriptors to {}\n", cnt_fds);
 }
 
-void application_impl::init_dpdk_eal(const cfg::config& cfg)
+application_impl::dpdk_eal::dpdk_eal(const cfg::config& cfg)
 {
     auto make_arg = []<typename... Args>(std::span<char>& buf,
                                          fmt::format_string<Args...> fmtstr,
@@ -70,26 +107,42 @@ void application_impl::init_dpdk_eal(const cfg::config& cfg)
     TG_ENFORCE(rte_eal_process_type() == RTE_PROC_PRIMARY);
 }
 
+application_impl::dpdk_eal::~dpdk_eal() noexcept
+{
+    rte_eal_cleanup();
+}
+
+void application_impl::run_management_thread() noexcept
+{
+    // TODO
+}
+
+void application_impl::run_worker_thread() noexcept
+{
+    // TODO
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 application::application(const stdfs::path& cfg_path)
 {
     cfg::config cfg(cfg_path);
-    try {
-        TGLOG_INFO("Starting with with settings: {}\n", cfg);
-        application_impl::ensure_enough_filedesc();
-        application_impl::init_dpdk_eal(cfg);
-        stdex::scope_fail cleanup([] { rte_eal_cleanup(); });
-        impl_ = std::make_unique<application_impl>(cfg);
-    } catch (const std::exception& ex) {
-        put::throw_runtime_error("Can not create Traffic-Generator. {}",
-                                 ex.what());
-    }
+    TGLOG_INFO("Starting with with settings: {}\n", cfg);
+    application_impl::ensure_enough_filedesc();
+    impl_ = std::make_unique<application_impl>(cfg);
 }
 
 application::~application() noexcept = default;
 
 void application::run() noexcept
 {
-    impl_->run();
+    rte_eal_mp_remote_launch(
+        [](void* impl) {
+            static_cast<application_impl*>(impl)->run();
+            return 0;
+        },
+        impl_.get(), CALL_MAIN);
+    rte_eal_mp_wait_lcore();
+
+    TGLOG_INFO("Application stopped\n");
 }
