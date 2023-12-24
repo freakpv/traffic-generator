@@ -1,11 +1,6 @@
 #include "mgmt/priv/http_server.h"
 #include "put/throw.h"
 
-template <>
-struct fmt::formatter<baio_tcp_endpoint> : fmt::ostream_formatter
-{
-};
-
 namespace mgmt::priv
 {
 

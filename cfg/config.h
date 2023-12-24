@@ -2,6 +2,17 @@
 
 namespace cfg
 {
+// boost::container::vector is used instead of std::vector because the
+// boost::program_options library provides special treatment for std::vector
+// which is not applicable to our usage.
+#define TGN_CONFIG_SETTINGS(MACRO)          \
+    MACRO(stdfs::path, working_dir)         \
+    MACRO(rte_ether_addr, gw_ether_addr)    \
+    MACRO(baio_tcp_endpoint, mgmt_endpoint) \
+    MACRO(cpu_idxs, cpus)                   \
+    MACRO(uint16_t, num_memory_channels)    \
+    MACRO(uint16_t, nic_queue_size)
+
 // The class holds the settings coming from the configuration file
 class config
 {
@@ -13,16 +24,6 @@ public:
     };
 
 private:
-// boost::container::vector is used instead of std::vector because the
-// boost::program_options library provides special treatment for std::vector
-// which is not applicable to our usage.
-#define TGN_CONFIG_SETTINGS(MACRO)       \
-    MACRO(stdfs::path, working_dir)      \
-    MACRO(rte_ether_addr, gw_ether_addr) \
-    MACRO(cpu_idxs, cpus)                \
-    MACRO(uint16_t, num_memory_channels) \
-    MACRO(uint16_t, nic_queue_size)
-
     struct opts
     {
 #define XXX(type, name) type name##_ = {};
@@ -54,10 +55,9 @@ public:
     const type& name() const { return opts_.name##_; }
     TGN_CONFIG_SETTINGS(XXX)
 #undef XXX
-
-#undef TGN_CONFIG_SETTINGS
 };
 
+#undef TGN_CONFIG_SETTINGS
 } // namespace cfg
 ////////////////////////////////////////////////////////////////////////////////
 template <>

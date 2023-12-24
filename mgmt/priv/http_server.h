@@ -10,7 +10,8 @@ public:
     using target_type     = std::string_view;
     using req_body_type   = std::string_view;
     using resp_body_type  = std::string;
-    using callback_type = std::function<void(bhttp::status, resp_body_type&&)>;
+    using callback_type =
+        std::move_only_function<void(bhttp::status, resp_body_type&&)>;
     using user_handler_type =
         std::function<void(target_type, req_body_type, callback_type&&)>;
     using error_handler_type =

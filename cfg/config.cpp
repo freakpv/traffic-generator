@@ -23,6 +23,30 @@ void validate(boost::any& out,
 
 void validate(boost::any& out,
               const std::vector<std::string>& val,
+              baio_tcp_endpoint*,
+              int)
+{
+    const auto& s = bpo::validators::get_single_string(val);
+    std::vector<std::string_view> parts;
+    balgo::split(
+        parts, s, [](char c) { return (c == ':'); }, balgo::token_compress_off);
+    if (parts.size() != 2) {
+        put::throw_runtime_error("No port in endpoint: {}", val);
+    }
+    bsys::error_code ec;
+    baio_ip_addr addr = baio::ip::make_address(parts[1], ec);
+    if (ec) {
+        put::throw_runtime_error("Invalid address in endpoint: {}", val);
+    }
+    std::optional port = put::str_to_int<uint16_t>(parts[2]);
+    if (!port) {
+        put::throw_runtime_error("Invalid port in endpoint: {}", val);
+    }
+    out = baio_tcp_endpoint(addr, *port);
+}
+
+void validate(boost::any& out,
+              const std::vector<std::string>& val,
               cfg::config::cpu_idxs*,
               int)
 {
