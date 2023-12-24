@@ -50,6 +50,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
+#include <boost/container/flat_map.hpp>
 #include <boost/outcome/result.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
