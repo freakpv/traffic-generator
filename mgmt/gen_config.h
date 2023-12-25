@@ -3,7 +3,7 @@
 namespace mgmt
 {
 
-class gen_cfg
+class gen_config
 {
 public:
     struct cap_cfg
@@ -23,16 +23,16 @@ private:
     std::vector<cap_cfg> cap_cfgs_;
 
 public:
-    explicit gen_cfg(std::string_view);
-    ~gen_cfg() noexcept;
+    explicit gen_config(std::string_view);
+    ~gen_config() noexcept;
 
     // Intentionally `noexcept` even if these are copy operation and may fail
-    gen_cfg(const gen_cfg&) noexcept;
-    gen_cfg& operator=(const gen_cfg&) noexcept;
+    gen_config(const gen_config&) noexcept;
+    gen_config& operator=(const gen_config&) noexcept;
 
-    gen_cfg()                     = delete;
-    gen_cfg(gen_cfg&&)            = delete;
-    gen_cfg& operator=(gen_cfg&&) = delete;
+    gen_config()                        = delete;
+    gen_config(gen_config&&)            = delete;
+    gen_config& operator=(gen_config&&) = delete;
 
     stdcr::milliseconds duration() const noexcept { return duration_; }
     rte_ether_addr dut_address() const noexcept { return dut_addr_; }

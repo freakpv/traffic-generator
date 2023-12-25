@@ -1,4 +1,4 @@
-#include "mgmt/gen_cfg.h"
+#include "mgmt/gen_config.h"
 
 #include "put/ether_addr.h"
 #include "put/num_utils.h"
@@ -57,7 +57,7 @@ struct fmt::formatter<bjson::string> : fmt::ostream_formatter
 namespace mgmt
 {
 
-gen_cfg::gen_cfg(std::string_view cfg_info)
+gen_config::gen_config(std::string_view cfg_info)
 {
     bjson::parser parser;
     parser.write(cfg_info);
@@ -137,8 +137,8 @@ gen_cfg::gen_cfg(std::string_view cfg_info)
     cap_cfgs_ = std::move(cap_cfgs);
 }
 
-gen_cfg::~gen_cfg() noexcept                         = default;
-gen_cfg::gen_cfg(const gen_cfg&) noexcept            = default;
-gen_cfg& gen_cfg::operator=(const gen_cfg&) noexcept = default;
+gen_config::~gen_config() noexcept                            = default;
+gen_config::gen_config(const gen_config&) noexcept            = default;
+gen_config& gen_config::operator=(const gen_config&) noexcept = default;
 
 } // namespace mgmt
