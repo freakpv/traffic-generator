@@ -18,6 +18,7 @@
 // DPDK headers
 #include <rte_errno.h>
 #include <rte_ether.h>
+#include <rte_ring.h>
 #include <rte_launch.h>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +36,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include <experimental/scope>
