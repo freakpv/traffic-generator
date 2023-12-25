@@ -7,7 +7,6 @@ namespace cfg
 // which is not applicable to our usage.
 #define TGN_CONFIG_SETTINGS(MACRO)          \
     MACRO(stdfs::path, working_dir)         \
-    MACRO(rte_ether_addr, gw_ether_addr)    \
     MACRO(baio_tcp_endpoint, mgmt_endpoint) \
     MACRO(cpu_idxs, cpus)                   \
     MACRO(uint16_t, num_memory_channels)    \

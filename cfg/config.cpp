@@ -9,20 +9,6 @@ namespace boost
 
 void validate(boost::any& out,
               const std::vector<std::string>& val,
-              rte_ether_addr*,
-              int)
-{
-    const auto& saddr = bpo::validators::get_single_string(val);
-    const auto addr   = put::parse_ether_addr(saddr);
-    if (!addr) {
-        put::throw_runtime_error("Failed to parse ethernet address: '{}'",
-                                 saddr);
-    }
-    out = *addr;
-}
-
-void validate(boost::any& out,
-              const std::vector<std::string>& val,
               baio_tcp_endpoint*,
               int)
 {

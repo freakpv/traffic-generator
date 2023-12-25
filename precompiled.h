@@ -25,6 +25,7 @@
 #include <array>
 #include <atomic>
 #include <charconv>
+#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <functional>
@@ -42,6 +43,7 @@
 // boost headers
 #include <boost/algorithm/string/split.hpp>
 #include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/network_v4.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/as_tuple.hpp>
 #include <boost/asio/awaitable.hpp>
@@ -51,6 +53,8 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/container/flat_map.hpp>
+#include <boost/json/parser.hpp>
+#include <boost/json/value.hpp>
 #include <boost/outcome/result.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
