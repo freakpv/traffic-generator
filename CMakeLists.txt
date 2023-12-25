@@ -70,6 +70,7 @@ target_link_directories(traffic-generator
 
 target_link_libraries(traffic-generator 
     PRIVATE ${LIBDPDK_STATIC_LDFLAGS} -lnuma -lpcap -lelf
+    PRIVATE -lboost_json
     PRIVATE -lboost_program_options
     PRIVATE -lfmt
 )

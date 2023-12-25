@@ -1,4 +1,7 @@
 #include "mgmt/gen_cfg.h"
+
+#include "put/ether_addr.h"
+#include "put/num_utils.h"
 #include "put/throw.h"
 
 /*
@@ -44,13 +47,18 @@
     ]
 }
 */
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+struct fmt::formatter<bjson::string> : fmt::ostream_formatter
+{
+};
 
 namespace mgmt
 {
 
 gen_cfg::gen_cfg(std::string_view cfg_info)
 {
-    bsys::error_code ec;
     bjson::parser parser;
     parser.write(cfg_info);
 
@@ -60,8 +68,14 @@ gen_cfg::gen_cfg(std::string_view cfg_info)
     const auto& ether_str = json_obj.at("dut_ether_addr").as_string();
     const auto& captures  = json_obj.at("captures").as_array();
 
-    auto load_opt_u64 = [](const auto& json_obj, std::string_view name) {
-        if (auto* p = json.at(name).if_uint64(); p) return *p;
+    const auto dut_addr = put::parse_ether_addr(ether_str);
+    if (!dut_addr) {
+        put::throw_runtime_error("Invalid `dut_ether_addr`: {}", dut_addr);
+    }
+
+    auto load_opt_u64 = [](const auto& json_obj,
+                           std::string_view name) -> std::optional<uint64_t> {
+        if (auto* p = json_obj.at(name).if_uint64(); p) return *p;
         return std::nullopt;
     };
 
@@ -76,8 +90,51 @@ gen_cfg::gen_cfg(std::string_view cfg_info)
         const auto& srv_ips_str = cap_obj.at("cln_ips").as_string();
         const auto cln_port_num = load_opt_u64(cap_obj, "cln_port");
 
-        // TODO
+        // The limits are kind of arbitrary but there should be some limits
+        if (!put::in_range_inclusive(burst_num, 1ul, 5ul)) {
+            put::throw_runtime_error(
+                "The `burst` value must be between 1 and 5");
+        }
+        if (!put::in_range_inclusive(sps_num, 1ul, 1'000'000ul)) {
+            put::throw_runtime_error("The `streams_per_second (sps)` value "
+                                     "must be between 1 and 1'000'000");
+        }
+        if (ipg_num && !put::in_range_inclusive(*ipg_num, 1ul, 100'000'000ul)) {
+            put::throw_runtime_error("The `streams_per_second (sps)` value "
+                                     "must be between 1 and 100'000'000");
+        }
+        if (cln_port_num &&
+            !put::in_range_inclusive(*cln_port_num, 1024ul, 65535ul)) {
+            put::throw_runtime_error(
+                "The `cln_port` value must be between 1024 and 65535");
+        }
+        bsys::error_code ec;
+        const auto cln_ips = baio::ip::make_network_v4(cln_ips_str, ec);
+        if (ec) {
+            put::throw_runtime_error("Invalid `cln_ips` network: {}",
+                                     cln_ips_str);
+        }
+        const auto srv_ips = baio::ip::make_network_v4(srv_ips_str, ec);
+        if (ec) {
+            put::throw_runtime_error("Invalid `srv_ips` network: {}",
+                                     srv_ips_str);
+        }
+
+        using ipg_type = std::optional<stdcr::microseconds>;
+        cap_cfgs.push_back(cap_cfg{
+            .name            = std::string_view(name_str),
+            .burst           = static_cast<uint32_t>(burst_num),
+            .streams_per_sec = static_cast<uint32_t>(sps_num),
+            .inter_pkts_gap  = ipg_num ? ipg_type(*ipg_num) : ipg_type{},
+            .cln_ips         = cln_ips,
+            .srv_ips         = srv_ips,
+            .cln_port        = cln_port_num,
+        });
     }
+
+    duration_ = stdcr::milliseconds(static_cast<uint64_t>(dur_num * 1000));
+    dut_addr_ = *dut_addr;
+    cap_cfgs_ = std::move(cap_cfgs);
 }
 
 gen_cfg::~gen_cfg() noexcept                         = default;
