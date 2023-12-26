@@ -1,7 +1,12 @@
 #include "app/application.h"
 #include "app/priv/config.h"
 
+#include "gen/manager.h"
+
 #include "log/log.h"
+
+#include "mgmt/manager.h"
+#include "mgmt/messages.h"
 
 #include "put/tg_assert.h"
 #include "put/file_utils.h"
@@ -27,55 +32,71 @@ class application_impl
 
     [[no_unique_address]] dpdk_eal eal_;
 
-    const stdfs::path working_dir_;
+    mgmt::inc_messages_queue g2m_queue_;
+    mgmt::out_messages_queue m2g_queue_;
+
+    gen::manager genr_;
+    mgmt::manager mgmt_;
+
     const std::array<uint16_t, 2> cpus_;
+
+    static inline std::atomic_flag stop_flag_{};
 
 public:
     explicit application_impl(const app::priv::config&);
 
     void run() noexcept;
 
-    static void ensure_enough_filedesc();
-
 private:
-    void run_management_thread() noexcept;
-    void run_worker_thread() noexcept;
+    static void signal_handler(int sig) noexcept;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 application_impl::application_impl(const app::priv::config& cfg)
-: eal_(cfg), working_dir_(cfg.working_dir()), cpus_(cfg.cpus())
+: eal_(cfg)
+, genr_(cfg.working_dir(), cfg.nic_queue_size(), g2m_queue_, m2g_queue_)
+, mgmt_(cfg.mgmt_endpoint(), g2m_queue_, m2g_queue_)
+, cpus_(cfg.cpus())
 {
+    auto sig_sub = [](auto... sig) {
+        return ((::signal(sig, signal_handler) != SIG_ERR) && ...);
+    };
+    if (!sig_sub(SIGINT, SIGTERM)) {
+        put::throw_system_error(errno, "Failed to subscribe to the OS signal");
+    }
 }
 
 void application_impl::run() noexcept
 {
+    auto run_loop = [](auto& mgr) {
+        while (!stop_flag_.test(std::memory_order_seq_cst)) {
+            mgr.process_events();
+        }
+    };
+
     if (const auto lcore = rte_lcore_id(); lcore == cpus_[0]) {
-        run_management_thread();
+        run_loop(mgmt_);
     } else if (lcore == cpus_[1]) {
-        run_worker_thread();
+        run_loop(genr_);
     } else {
         TG_UNREACHABLE();
     }
 }
 
-void application_impl::ensure_enough_filedesc()
+void application_impl::signal_handler(int sig) noexcept
 {
-    // When creating the DPDK mbufs pool the DPDK framework opens file
-    // descriptors for every huge page which is part of the pool. It does
-    // this for the virtual to physical mapping machinery. Here we just
-    // ensure that there are enough file descriptors even for very large
-    // amount of huge pages. 65536 * 2 MB huge page size ensures that the
-    // application will be able to open file descriptors for almost 128 GB
-    // huge pages which is more than it'll even need in practice.
-    constexpr auto cnt_fds = 64 * 1024uz;
-    if (auto res = put::set_max_count_fds(cnt_fds); !res) {
-        put::throw_system_error(
-            res.error(),
-            "Failed to set the max count of file descriptors to {}!", cnt_fds);
+    switch (sig) {
+    case SIGINT: {
+        TGLOG_INFO("Stop requested via SIGINT\n");
+        stop_flag_.test_and_set(std::memory_order_seq_cst);
+    } break;
+    case SIGTERM:
+        TGLOG_INFO("Stop requested via SIGTERM\n");
+        stop_flag_.test_and_set(std::memory_order_seq_cst);
+        break;
+    default: TG_UNREACHABLE(); break;
     }
-    TGLOG_INFO("Set max file descriptors to {}\n", cnt_fds);
 }
 
 application_impl::dpdk_eal::dpdk_eal(const app::priv::config& cfg)
@@ -114,23 +135,12 @@ application_impl::dpdk_eal::~dpdk_eal() noexcept
     rte_eal_cleanup();
 }
 
-void application_impl::run_management_thread() noexcept
-{
-    // TODO
-}
-
-void application_impl::run_worker_thread() noexcept
-{
-    // TODO
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 application::application(const stdfs::path& cfg_path)
 {
     app::priv::config cfg(cfg_path);
     TGLOG_INFO("Starting with with settings: {}\n", cfg);
-    application_impl::ensure_enough_filedesc();
     impl_ = std::make_unique<application_impl>(cfg);
 }
 
