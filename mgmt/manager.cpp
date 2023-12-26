@@ -80,7 +80,7 @@ manager_impl::manager_impl(const baio_tcp_endpoint& endpoint,
 
 void manager_impl::process_events() noexcept
 {
-    io_ctx_.poll();
+    io_ctx_.poll_one();
     inc_queue_.dequeue([this](auto&& msg) { on_inc_msg(std::move(msg)); });
 }
 
