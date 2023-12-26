@@ -3,10 +3,19 @@
 namespace put // project utilities
 {
 
+template <class... Funs>
+struct overload : Funs...
+{
+    using Funs::operator()...;
+};
+template <class... Funs>
+overload(Funs...) -> overload<Funs...>;
+
 template <typename Variant, typename... Visitor>
 decltype(auto) visit(Variant&& var, Visitor&&... vis)
 {
     using variant_type = std::remove_cvref_t<Variant>;
+    auto fun           = overload(std::forward<Visitor>(vis)...);
     return bmp11::mp_with_index<std::variant_size_v<variant_type>>(
         var.index(), [&](auto idx) -> decltype(auto) {
             using std::get_if;
