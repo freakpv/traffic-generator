@@ -9,6 +9,7 @@ namespace app::priv
     MACRO(stdfs::path, working_dir)         \
     MACRO(baio_tcp_endpoint, mgmt_endpoint) \
     MACRO(cpu_idxs, cpus)                   \
+    MACRO(uint32_t, max_cnt_mbufs)          \
     MACRO(uint16_t, num_memory_channels)    \
     MACRO(uint16_t, nic_queue_size)
 

@@ -10,6 +10,7 @@ namespace mgmt // management
 
 class manager_impl
 {
+    using config_type        = manager::config;
     using target_type        = mgmt::priv::http_server::target_type;
     using req_body_type      = mgmt::priv::http_server::req_body_type;
     using resp_body_type     = mgmt::priv::http_server::resp_body_type;
@@ -23,17 +24,15 @@ class manager_impl
 private:
     baio_context io_ctx_;
     mgmt::priv::http_server http_server_;
-    inc_messages_queue& inc_queue_;
-    out_messages_queue& out_queue_;
+    inc_messages_queue* inc_queue_;
+    out_messages_queue* out_queue_;
 
     req_handlers_type req_handlers_;
     resp_callback_type start_cb_;
     resp_callback_type stop_cb_;
 
 public:
-    manager_impl(const baio_tcp_endpoint&,
-                 inc_messages_queue&,
-                 out_messages_queue&);
+    explicit manager_impl(const config_type&);
 
     void process_events() noexcept;
 
@@ -60,12 +59,12 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-manager_impl::manager_impl(const baio_tcp_endpoint& endpoint,
-                           inc_messages_queue& inc_queue,
-                           out_messages_queue& out_queue)
-: http_server_(io_ctx_, endpoint), inc_queue_(inc_queue), out_queue_(out_queue)
+manager_impl::manager_impl(const config_type& cfg)
+: http_server_(io_ctx_, cfg.endpoint)
+, inc_queue_(cfg.inc_queue)
+, out_queue_(cfg.out_queue)
 {
-    TGLOG_INFO("Started management server at {}\n", endpoint);
+    TGLOG_INFO("Started management server at {}\n", cfg.endpoint);
 
     init_req_handlers();
 
@@ -81,7 +80,7 @@ manager_impl::manager_impl(const baio_tcp_endpoint& endpoint,
 void manager_impl::process_events() noexcept
 {
     io_ctx_.poll_one();
-    inc_queue_.dequeue([this](auto&& msg) { on_inc_msg(std::move(msg)); });
+    inc_queue_->dequeue([this](auto&& msg) { on_inc_msg(std::move(msg)); });
 }
 
 void manager_impl::on_http_request(target_type target,
@@ -125,7 +124,7 @@ void manager_impl::on_req_start_gen(req_body_type req,
     }
     try {
         auto cfg = std::make_unique<mgmt::gen_config>(req);
-        if (out_queue_.enqueue(req_start_generation{std::move(cfg)})) {
+        if (out_queue_->enqueue(req_start_generation{std::move(cfg)})) {
             TGLOG_INFO("Enqueued start generation request\n");
             start_cb_ = std::move(cb);
         } else {
@@ -151,7 +150,7 @@ void manager_impl::on_req_stop_gen(req_body_type,
            make_response_body("Stop already in progress"));
         return;
     }
-    if (out_queue_.enqueue(req_stop_generation{})) {
+    if (out_queue_->enqueue(req_stop_generation{})) {
         TGLOG_INFO("Enqueued stop generation request\n");
         stop_cb_ = std::move(cb);
     } else {
@@ -218,10 +217,7 @@ manager_impl::make_response_body(fmt::format_string<Args...> fmtstr,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-manager::manager(const baio_tcp_endpoint& endpoint,
-                 inc_messages_queue& inc_queue,
-                 out_messages_queue& out_queue)
-: impl_(std::make_unique<manager_impl>(endpoint, inc_queue, out_queue))
+manager::manager(const config& cfg) : impl_(std::make_unique<manager_impl>(cfg))
 {
 }
 

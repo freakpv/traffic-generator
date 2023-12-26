@@ -55,8 +55,14 @@ private:
 
 application_impl::application_impl(const app::priv::config& cfg)
 : eal_(cfg)
-, genr_(cfg.working_dir(), cfg.nic_queue_size(), g2m_queue_, m2g_queue_)
-, mgmt_(cfg.mgmt_endpoint(), g2m_queue_, m2g_queue_)
+, genr_({.working_dir    = cfg.working_dir(),
+         .max_cnt_mbufs  = cfg.max_cnt_mbufs(),
+         .nic_queue_size = cfg.nic_queue_size(),
+         .inc_queue      = &m2g_queue_,
+         .out_queue      = &g2m_queue_})
+, mgmt_({.endpoint  = cfg.mgmt_endpoint(),
+         .inc_queue = &g2m_queue_,
+         .out_queue = &m2g_queue_})
 , cpus_(cfg.cpus())
 {
     auto sig_sub = [](auto... sig) {

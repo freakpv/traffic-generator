@@ -14,10 +14,19 @@ class manager
     std::unique_ptr<class manager_impl> impl_;
 
 public:
-    manager(const stdfs::path& working_dir,
-            uint16_t nic_queue_size,
-            mgmt::inc_messages_queue&,
-            mgmt::out_messages_queue&);
+    // The incoming queue for the management module is outgoing queue for us.
+    // And vice versa.
+    struct config
+    {
+        stdfs::path working_dir;
+        uint32_t max_cnt_mbufs;
+        uint16_t nic_queue_size;
+        mgmt::out_messages_queue* inc_queue;
+        mgmt::inc_messages_queue* out_queue;
+    };
+
+public:
+    explicit manager(const config&);
     ~manager() noexcept;
 
     manager()                          = delete;

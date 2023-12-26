@@ -14,7 +14,7 @@ class mbuf_pool
 public:
     struct config
     {
-        size_t cnt_mbufs;
+        uint32_t cnt_mbufs;
         uint32_t socket_id;
     };
 
