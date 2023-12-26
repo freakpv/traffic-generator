@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h> // size_t
 #include <string.h>
 #include <ucontext.h>
 #include <unistd.h>
@@ -32,6 +33,7 @@
 #include <functional>
 #include <optional>
 #include <memory>
+#include <new> // launder
 #include <span>
 #include <stdexcept>
 #include <string_view>
