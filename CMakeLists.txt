@@ -32,6 +32,8 @@ file(GLOB PROJECT_SOURCES CONFIGURE_DEPENDS
      "*.cpp"
      "app/*.cpp"
      "app/priv/*.cpp"
+     "gen/*.cpp"
+     "gen/priv/*.cpp"
      "mgmt/*.cpp"
      "mgmt/priv/*.cpp"
      "put/*.cpp"
