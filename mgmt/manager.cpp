@@ -1,4 +1,6 @@
 #include "mgmt/manager.h"
+#include "mgmt/gen_config.h"
+#include "mgmt/messages.h"
 #include "mgmt/priv/http_server.h"
 #include "log/log.h"
 
@@ -20,10 +22,17 @@ class manager_impl
 private:
     baio_context io_ctx_;
     mgmt::priv::http_server http_server_;
+    inc_messages_queue& inc_queue_;
+    out_messages_queue& out_queue_;
+
     req_handlers_type req_handlers_;
+    resp_callback_type start_cb_;
+    resp_callback_type stop_cb_;
 
 public:
-    explicit manager_impl(const baio_tcp_endpoint& endpoint);
+    manager_impl(const baio_tcp_endpoint&,
+                 inc_messages_queue&,
+                 out_messages_queue&);
 
     void process_events() noexcept;
 
@@ -42,8 +51,10 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-manager_impl::manager_impl(const baio_tcp_endpoint& endpoint)
-: http_server_(io_ctx_, endpoint)
+manager_impl::manager_impl(const baio_tcp_endpoint& endpoint,
+                           inc_messages_queue& inc_queue,
+                           out_messages_queue& out_queue)
+: http_server_(io_ctx_, endpoint), inc_queue_(inc_queue), out_queue_(out_queue)
 {
     TGLOG_INFO("Started management server at {}\n", endpoint);
 
@@ -71,8 +82,8 @@ void manager_impl::on_http_request(target_type target,
     if (auto it = req_handlers_.find(target); it != req_handlers_.end()) {
         std::invoke(it->second, this, req_body, std::move(cb));
     } else {
-        cb(bhttp::status::bad_request,
-           fmt::format("Invalid target: {}", target));
+        TGLOG_INFO("Got request for invalid target: {}\n", target);
+        cb(bhttp::status::not_found, fmt::format("Invalid target: {}", target));
     }
 }
 
@@ -92,15 +103,48 @@ void manager_impl::init_req_handlers() noexcept
     req_handlers_["/get_stats"sv] = &manager_impl::on_req_get_stats;
 }
 
-void manager_impl::on_req_start_gen(req_body_type,
-                                    resp_callback_type&&) noexcept
+void manager_impl::on_req_start_gen(req_body_type req,
+                                    resp_callback_type&& cb) noexcept
 {
-    // TODO
+    TGLOG_INFO("Got start generation request\n");
+    if (start_cb_) {
+        TGLOG_INFO("Start already in progress\n");
+        cb(bhttp::status::precondition_failed, "Start already in progress");
+        return;
+    }
+    try {
+        auto cfg = std::make_unique<mgmt::gen_config>(req);
+        if (out_queue_.enqueue(req_start_generation{std::move(cfg)})) {
+            TGLOG_INFO("Enqueued start generation request\n");
+            start_cb_ = std::move(cb);
+        } else {
+            TGLOG_INFO("Failed to enqueue start generation request\n");
+            cb(bhttp::status::internal_server_error,
+               "Failed to enqueue request");
+        }
+    } catch (const std::exception& ex) {
+        TGLOG_INFO("Invalid generation configuration: {}\n", ex.what());
+        cb(bhttp::status::bad_request,
+           fmt::format("Invalid generation configuration: {}", ex.what()));
+    }
 }
 
-void manager_impl::on_req_stop_gen(req_body_type, resp_callback_type&&) noexcept
+void manager_impl::on_req_stop_gen(req_body_type,
+                                   resp_callback_type&& cb) noexcept
 {
-    // TODO
+    TGLOG_INFO("Got stop generation request\n");
+    if (stop_cb_) {
+        TGLOG_INFO("Stop already in progress\n");
+        cb(bhttp::status::precondition_failed, "Stop already in progress");
+        return;
+    }
+    if (out_queue_.enqueue(req_stop_generation{})) {
+        TGLOG_INFO("Enqueued stop generation request\n");
+        stop_cb_ = std::move(cb);
+    } else {
+        TGLOG_INFO("Failed to enqueue stop generation request\n");
+        cb(bhttp::status::internal_server_error, "Failed to enqueue request");
+    }
 }
 
 void manager_impl::on_req_get_stats(req_body_type,
@@ -111,8 +155,10 @@ void manager_impl::on_req_get_stats(req_body_type,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-manager::manager(const baio_tcp_endpoint& endpoint)
-: impl_(std::make_unique<manager_impl>(endpoint))
+manager::manager(const baio_tcp_endpoint& endpoint,
+                 inc_messages_queue& inc_queue,
+                 out_messages_queue& out_queue)
+: impl_(std::make_unique<manager_impl>(endpoint, inc_queue, out_queue))
 {
 }
 
