@@ -11,6 +11,7 @@ namespace beast = boost::beast;
 namespace bcont = boost::container;
 namespace bhttp = boost::beast::http;
 namespace bjson = boost::json;
+namespace bmp11 = boost::mp11;
 namespace bout  = boost::outcome_v2;
 namespace bpo   = boost::program_options;
 namespace bsys  = boost::system;

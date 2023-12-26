@@ -39,6 +39,7 @@
 #include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <experimental/scope>
@@ -59,6 +60,7 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/json/parser.hpp>
 #include <boost/json/value.hpp>
+#include <boost/mp11/algorithm.hpp>
 #include <boost/outcome/result.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
