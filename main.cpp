@@ -1,6 +1,7 @@
 #include "aliases.h"
-#include "application.h"
 #include "version_info.h"
+
+#include "app/application.h"
 
 #include "log/log.h"
 #include "put/stacktrace.h"
@@ -42,7 +43,7 @@ int main(int argc, char** argv)
                 put::throw_system_error(
                     err, "Unable to setup the stacktrace dumper");
             }
-            application(vm["config"].as<stdfs::path>()).run();
+            app::application(vm["config"].as<stdfs::path>()).run();
         } else {
             put::throw_runtime_error("No options provided.\n{}", opts);
         }

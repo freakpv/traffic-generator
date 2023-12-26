@@ -1,5 +1,8 @@
 #pragma once
 
+namespace app
+{
+
 class application
 {
     std::unique_ptr<class application_impl> impl_;
@@ -16,3 +19,5 @@ public:
 
     void run() noexcept;
 };
+
+} // namespace app

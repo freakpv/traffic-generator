@@ -1,6 +1,6 @@
 #pragma once
 
-namespace cfg
+namespace app::priv
 {
 // boost::container::vector is used instead of std::vector because the
 // boost::program_options library provides special treatment for std::vector
@@ -57,12 +57,12 @@ public:
 };
 
 #undef TGN_CONFIG_SETTINGS
-} // namespace cfg
+} // namespace app::priv
 ////////////////////////////////////////////////////////////////////////////////
 template <>
-struct fmt::formatter<cfg::config>
+struct fmt::formatter<app::priv::config>
 {
     constexpr auto parse(auto& ctx) const noexcept { return ctx.begin(); }
-    format_context::iterator format(const cfg::config&,
+    format_context::iterator format(const app::priv::config&,
                                     format_context&) const noexcept;
 };

@@ -1,6 +1,6 @@
-#include "application.h"
+#include "app/application.h"
+#include "app/priv/config.h"
 
-#include "cfg/config.h"
 #include "log/log.h"
 
 #include "put/tg_assert.h"
@@ -8,12 +8,14 @@
 #include "put/throw.h"
 
 ////////////////////////////////////////////////////////////////////////////////
+namespace app
+{
 
 class application_impl
 {
     struct dpdk_eal
     {
-        dpdk_eal(const cfg::config&);
+        dpdk_eal(const app::priv::config&);
         ~dpdk_eal() noexcept;
 
         dpdk_eal()                           = delete;
@@ -29,7 +31,7 @@ class application_impl
     const std::array<uint16_t, 2> cpus_;
 
 public:
-    explicit application_impl(const cfg::config&);
+    explicit application_impl(const app::priv::config&);
 
     void run() noexcept;
 
@@ -42,7 +44,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-application_impl::application_impl(const cfg::config& cfg)
+application_impl::application_impl(const app::priv::config& cfg)
 : eal_(cfg), working_dir_(cfg.working_dir()), cpus_(cfg.cpus())
 {
 }
@@ -76,7 +78,7 @@ void application_impl::ensure_enough_filedesc()
     TGLOG_INFO("Set max file descriptors to {}\n", cnt_fds);
 }
 
-application_impl::dpdk_eal::dpdk_eal(const cfg::config& cfg)
+application_impl::dpdk_eal::dpdk_eal(const app::priv::config& cfg)
 {
     auto make_arg = []<typename... Args>(std::span<char>& buf,
                                          fmt::format_string<Args...> fmtstr,
@@ -126,7 +128,7 @@ void application_impl::run_worker_thread() noexcept
 
 application::application(const stdfs::path& cfg_path)
 {
-    cfg::config cfg(cfg_path);
+    app::priv::config cfg(cfg_path);
     TGLOG_INFO("Starting with with settings: {}\n", cfg);
     application_impl::ensure_enough_filedesc();
     impl_ = std::make_unique<application_impl>(cfg);
@@ -146,3 +148,5 @@ void application::run() noexcept
 
     TGLOG_INFO("Application stopped\n");
 }
+
+} // namespace app

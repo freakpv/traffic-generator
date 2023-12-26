@@ -1,4 +1,4 @@
-#include "cfg/config.h"
+#include "app/priv/config.h"
 #include "put/ether_addr.h"
 #include "put/string_utils.h"
 #include "put/throw.h"
@@ -33,7 +33,7 @@ void validate(boost::any& out,
 
 void validate(boost::any& out,
               const std::vector<std::string>& val,
-              cfg::config::cpu_idxs*,
+              app::priv::config::cpu_idxs*,
               int)
 {
     try {
@@ -43,7 +43,7 @@ void validate(boost::any& out,
         balgo::split(
             parts, s, [](char c) { return (c == ','); },
             balgo::token_compress_on);
-        cfg::config::cpu_idxs ret;
+        app::priv::config::cpu_idxs ret;
         if (const auto cnt = ret.size(); parts.size() != cnt) {
             put::throw_runtime_error("Expect {} cpus", cnt);
         }
@@ -57,7 +57,7 @@ void validate(boost::any& out,
 
 } // namespace boost
 ////////////////////////////////////////////////////////////////////////////////
-namespace cfg
+namespace app::priv
 {
 
 config::config(const stdfs::path& config_path)
@@ -104,11 +104,10 @@ config::config(const stdfs::path& config_path)
 
 config::~config() noexcept = default;
 
-} // namespace cfg
+} // namespace app::priv
 ////////////////////////////////////////////////////////////////////////////////
-fmt::format_context::iterator
-fmt::formatter<cfg::config>::format(const cfg::config& arg,
-                                    fmt::format_context& ctx) const noexcept
+fmt::format_context::iterator fmt::formatter<app::priv::config>::format(
+    const app::priv::config& arg, fmt::format_context& ctx) const noexcept
 {
     auto it = ctx.out();
     arg.opts_.visit([&it]<typename V>(std::string_view name, const V& val) {

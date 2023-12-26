@@ -30,7 +30,8 @@ add_custom_target(generate-version-info
 
 file(GLOB PROJECT_SOURCES CONFIGURE_DEPENDS
      "*.cpp"
-     "cfg/*.cpp"
+     "app/*.cpp"
+     "app/priv/*.cpp"
      "mgmt/*.cpp"
      "mgmt/priv/*.cpp"
      "put/*.cpp"
