@@ -14,7 +14,7 @@ struct req_start_generation
 
 struct res_start_generation
 {
-    bsys::error_code err;
+    bout::result<void> res = bout::success();
 };
 
 struct req_stop_generation
@@ -23,8 +23,8 @@ struct req_stop_generation
 
 struct res_stop_generation
 {
-    bsys::error_code err;
     // TODO: The summary stats should be added here
+    bout::result<void> res = bout::success();
 };
 
 struct stats_report

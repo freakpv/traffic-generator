@@ -3,6 +3,7 @@
 #include "mgmt/messages.h"
 #include "mgmt/priv/http_server.h"
 #include "log/log.h"
+#include "put/tg_assert.h"
 
 namespace mgmt // management
 {
@@ -47,6 +48,14 @@ private:
     void on_req_start_gen(req_body_type, resp_callback_type&&) noexcept;
     void on_req_stop_gen(req_body_type, resp_callback_type&&) noexcept;
     void on_req_get_stats(req_body_type, resp_callback_type&&) noexcept;
+
+    void on_inc_msg(mgmt::res_start_generation&&) noexcept;
+    void on_inc_msg(mgmt::res_stop_generation&&) noexcept;
+    void on_inc_msg(mgmt::stats_report&&) noexcept;
+
+    template <typename... Args>
+    static resp_body_type make_response_body(fmt::format_string<Args...>,
+                                             Args&&...) noexcept;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,7 +81,7 @@ manager_impl::manager_impl(const baio_tcp_endpoint& endpoint,
 void manager_impl::process_events() noexcept
 {
     io_ctx_.poll();
-    // TODO:
+    inc_queue_.dequeue([this](auto&& msg) { on_inc_msg(std::move(msg)); });
 }
 
 void manager_impl::on_http_request(target_type target,
@@ -83,7 +92,8 @@ void manager_impl::on_http_request(target_type target,
         std::invoke(it->second, this, req_body, std::move(cb));
     } else {
         TGLOG_INFO("Got request for invalid target: {}\n", target);
-        cb(bhttp::status::not_found, fmt::format("Invalid target: {}", target));
+        cb(bhttp::status::not_found,
+           make_response_body("Invalid target: {}", target));
     }
 }
 
@@ -109,7 +119,8 @@ void manager_impl::on_req_start_gen(req_body_type req,
     TGLOG_INFO("Got start generation request\n");
     if (start_cb_) {
         TGLOG_INFO("Start already in progress\n");
-        cb(bhttp::status::precondition_failed, "Start already in progress");
+        cb(bhttp::status::precondition_failed,
+           make_response_body("Start already in progress"));
         return;
     }
     try {
@@ -120,12 +131,13 @@ void manager_impl::on_req_start_gen(req_body_type req,
         } else {
             TGLOG_INFO("Failed to enqueue start generation request\n");
             cb(bhttp::status::internal_server_error,
-               "Failed to enqueue request");
+               make_response_body("Failed to enqueue request"));
         }
     } catch (const std::exception& ex) {
         TGLOG_INFO("Invalid generation configuration: {}\n", ex.what());
         cb(bhttp::status::bad_request,
-           fmt::format("Invalid generation configuration: {}", ex.what()));
+           make_response_body("Invalid generation configuration: {}",
+                              ex.what()));
     }
 }
 
@@ -135,7 +147,8 @@ void manager_impl::on_req_stop_gen(req_body_type,
     TGLOG_INFO("Got stop generation request\n");
     if (stop_cb_) {
         TGLOG_INFO("Stop already in progress\n");
-        cb(bhttp::status::precondition_failed, "Stop already in progress");
+        cb(bhttp::status::precondition_failed,
+           make_response_body("Stop already in progress"));
         return;
     }
     if (out_queue_.enqueue(req_stop_generation{})) {
@@ -143,7 +156,8 @@ void manager_impl::on_req_stop_gen(req_body_type,
         stop_cb_ = std::move(cb);
     } else {
         TGLOG_INFO("Failed to enqueue stop generation request\n");
-        cb(bhttp::status::internal_server_error, "Failed to enqueue request");
+        cb(bhttp::status::internal_server_error,
+           make_response_body("Failed to enqueue request"));
     }
 }
 
@@ -151,6 +165,55 @@ void manager_impl::on_req_get_stats(req_body_type,
                                     resp_callback_type&&) noexcept
 {
     // TODO
+}
+
+void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
+{
+    TG_ENFORCE(start_cb_);
+    if (msg.res) {
+        TGLOG_INFO("Successfully started generation\n");
+        start_cb_(bhttp::status::ok, make_response_body("Generation started"));
+    } else {
+        TGLOG_INFO("Failed to start generation: {}\n", msg.res.error());
+        start_cb_(bhttp::status::precondition_failed,
+                  make_response_body("Failed to start generation: {}\n",
+                                     msg.res.error()));
+    }
+    start_cb_ = {};
+}
+
+void manager_impl::on_inc_msg(mgmt::res_stop_generation&& msg) noexcept
+{
+    TG_ENFORCE(stop_cb_);
+    if (msg.res) {
+        TGLOG_INFO("Successfully stopped generation\n");
+        // TODO:
+    } else {
+        TGLOG_INFO("Failed to stop generation: {}\n", msg.res.error());
+        stop_cb_(bhttp::status::precondition_failed,
+                 make_response_body("Failed to stop generation: {}\n",
+                                    msg.res.error()));
+    }
+    stop_cb_ = {};
+}
+
+void manager_impl::on_inc_msg(mgmt::stats_report&&) noexcept
+{
+    // TODO
+}
+
+template <typename... Args>
+manager_impl::resp_body_type
+manager_impl::make_response_body(fmt::format_string<Args...> fmtstr,
+                                 Args&&... args) noexcept
+{
+    resp_body_type body;
+    body.reserve(512);
+    body += R"({"result": ")";
+    fmt::format_to(std::back_inserter(body), fmtstr,
+                   std::forward<Args>(args)...);
+    body += R"("})";
+    return body;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
