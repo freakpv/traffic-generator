@@ -13,6 +13,8 @@
 #include <string.h>
 #include <ucontext.h>
 #include <unistd.h>
+
+#include <pcap/pcap.h>
 #include <sys/resource.h>
 
 ////////////////////////////////////////////////////////////////////////////////
