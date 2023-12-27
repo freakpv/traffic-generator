@@ -1,0 +1,54 @@
+#!/bin/bash
+
+while getopts ":c:f:s:w:" opt; do
+	case ${opt} in
+		c) count=$OPTARG;
+			;;
+		f) filter=$OPTARG;
+			;;
+		s) snaplen=$OPTARG;
+			;;
+		w) wrfile=$OPTARG;
+			;;
+		?) 
+ 			echo "Usage: $0 [-c]<packet count> [-f]<'pcap filter'> [-s]<snapshot length> [-w]<write file-path>"
+			exit 1
+			;;
+	esac
+done
+
+# This is needed because the proxy may have opened big amount of huge pages and 
+# and the dumpcap tool needs to map this memory as a secondary process.
+# The physical to virtual address mapping requires one file descriptor for 
+# every huge page and thus we may need lots of file descriptors to map the
+# memory of the primary process.
+ulimit -n 65536
+
+dumpcap=/z/tgn/dpdk-dumpcap
+
+# if there is single interface the 'tail' call will match it
+# if there are multiple interfaces their bonding seem to be printed always last
+# so in this case the 'tail` call is expected to return the name of the bonding 
+# interface and we'll dump on it
+interface=$(${dumpcap} -D 2>/dev/null | tail -n1)
+if [ $? -ne 0 ] ; then
+	echo "Failed to get list of DPDK interfaces!"
+	echo "Please, make sure that the proxy application is running!"
+	exit 1
+fi
+cmdline=$(echo "${interface}" | awk -F' ' '{print "-P -i "$2" "}')
+if [[ ! -z "$count" ]]; then
+	cmdline="${cmdline} -c ${count}"
+fi
+if [[ ! -z "$filter" ]]; then
+	cmdline="${cmdline} -f '${filter}'"
+fi
+if [[ ! -z "$snaplen" ]]; then
+	cmdline="${cmdline} -s ${snaplen}"
+fi
+if [[ ! -z "$wrfile" ]]; then
+	cmdline="${cmdline} -w ${wrfile}"
+fi
+
+eval "${dumpcap} ${cmdline}"
+exit $?
