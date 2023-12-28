@@ -34,8 +34,8 @@ public:
     gen_config(gen_config&&)            = delete;
     gen_config& operator=(gen_config&&) = delete;
 
-    stdcr::milliseconds duration() const noexcept { return duration_; }
     rte_ether_addr dut_address() const noexcept { return dut_addr_; }
+    stdcr::milliseconds duration() const noexcept { return duration_; }
     std::span<const cap_cfg> cap_configs() const noexcept { return cap_cfgs_; }
 };
 

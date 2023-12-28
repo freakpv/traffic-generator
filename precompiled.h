@@ -19,11 +19,13 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // DPDK headers
+#include <rte_cycles.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_ether.h>
-#include <rte_mbuf.h>
 #include <rte_launch.h>
+#include <rte_mbuf.h>
+#include <rte_timer.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // c++ standard library headers
@@ -74,6 +76,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // fmt headers
+#include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
