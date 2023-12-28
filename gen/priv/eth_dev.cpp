@@ -119,8 +119,6 @@ void eth_dev::configure(const config& cfg,
                         const rte_eth_dev_info& dev_info,
                         const rte_eth_conf& dev_conf)
 {
-    constexpr uint16_t qu_id   = 0;
-    constexpr uint16_t nqueues = 1;
     if (rte_eth_dev_configure(cfg.port_id, nqueues, nqueues, &dev_conf) != 0) {
         put::throw_dpdk_error(
             rte_errno,
@@ -129,25 +127,25 @@ void eth_dev::configure(const config& cfg,
     }
     rte_eth_rxconf rxq_conf = dev_info.default_rxconf;
     rxq_conf.offloads       = dev_conf.rxmode.offloads;
-    if (rte_eth_rx_queue_setup(cfg.port_id, qu_id, cfg.queue_size,
+    if (rte_eth_rx_queue_setup(cfg.port_id, queue_id, cfg.queue_size,
                                cfg.socket_id, &rxq_conf, cfg.mempool) != 0) {
         const auto& lim = dev_info.rx_desc_lim;
         put::throw_dpdk_error(
             rte_errno,
             "Failed to initialize DPDK port {}. Failed to setup Rx queue {} "
             "with size {}. HW queue size range {}-{}",
-            cfg.port_id, qu_id, cfg.queue_size, lim.nb_min, lim.nb_max);
+            cfg.port_id, queue_id, cfg.queue_size, lim.nb_min, lim.nb_max);
     }
     rte_eth_txconf txq_conf = dev_info.default_txconf;
     txq_conf.offloads       = dev_conf.txmode.offloads;
-    if (rte_eth_tx_queue_setup(cfg.port_id, qu_id, cfg.queue_size,
+    if (rte_eth_tx_queue_setup(cfg.port_id, queue_id, cfg.queue_size,
                                cfg.socket_id, &txq_conf) != 0) {
         const auto& lim = dev_info.tx_desc_lim;
         put::throw_dpdk_error(
             rte_errno,
             "Failed to initialize DPDK port {}. Failed to setup Tx queue {} "
             "with size {}. HW queue size range {}-{}",
-            cfg.port_id, qu_id, cfg.queue_size, lim.nb_min, lim.nb_max);
+            cfg.port_id, queue_id, cfg.queue_size, lim.nb_min, lim.nb_max);
     }
 }
 

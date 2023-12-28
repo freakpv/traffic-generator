@@ -5,6 +5,8 @@ namespace gen::priv // generator
 
 class eth_dev
 {
+    static constexpr uint16_t queue_id        = 0;
+    static constexpr uint16_t nqueues         = 1;
     static constexpr uint16_t invalid_port_id = UINT16_MAX;
 
     uint16_t port_id_ = invalid_port_id;
@@ -35,6 +37,15 @@ public:
 
     uint16_t port_id() const noexcept { return port_id_; }
     bool is_valid() const noexcept { return (port_id_ != invalid_port_id); }
+
+    size_t receive_pkts(std::span<rte_mbuf*> into) noexcept
+    {
+        return rte_eth_rx_burst(port_id_, queue_id, into.data(), into.size());
+    }
+    size_t transmit_pkts(std::span<rte_mbuf*> pkts) noexcept
+    {
+        return rte_eth_tx_burst(port_id_, queue_id, pkts.data(), pkts.size());
+    }
 
 private:
     std::pair<rte_eth_dev_info, rte_eth_conf> set_capabilities(const config&);
