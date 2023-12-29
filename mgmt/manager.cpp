@@ -169,14 +169,14 @@ void manager_impl::on_req_get_stats(req_body_type,
 void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
 {
     TG_ENFORCE(start_cb_);
-    if (!msg.error_desc) {
+    if (msg.res) {
         TGLOG_INFO("Successfully started generation\n");
         start_cb_(bhttp::status::ok, make_response_body("Generation started"));
     } else {
-        TGLOG_INFO("Failed to start generation: {}\n", *msg.error_desc);
+        TGLOG_INFO("Failed to start generation: {}\n", msg.res.error());
         start_cb_(bhttp::status::precondition_failed,
                   make_response_body("Failed to start generation: {}\n",
-                                     *msg.error_desc));
+                                     msg.res.error()));
     }
     start_cb_ = {};
 }
@@ -184,14 +184,14 @@ void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
 void manager_impl::on_inc_msg(mgmt::res_stop_generation&& msg) noexcept
 {
     TG_ENFORCE(stop_cb_);
-    if (!msg.error_desc) {
+    if (msg.res) {
         TGLOG_INFO("Successfully stopped generation\n");
         // TODO:
     } else {
-        TGLOG_INFO("Failed to stop generation: {}\n", *msg.error_desc);
+        TGLOG_INFO("Failed to stop generation: {}\n", msg.res.error());
         stop_cb_(bhttp::status::precondition_failed,
                  make_response_body("Failed to stop generation: {}\n",
-                                    *msg.error_desc));
+                                    msg.res.error()));
     }
     stop_cb_ = {};
 }

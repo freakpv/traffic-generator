@@ -6,10 +6,10 @@
 #include <execinfo.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stddef.h> // size_t
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h> // size_t
 #include <string.h>
 #include <ucontext.h>
 #include <unistd.h>

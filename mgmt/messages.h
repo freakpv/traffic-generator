@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mgmt/gen_config.h"
+#include "mgmt/stats.h"
 #include "put/spsc_ring.h"
 #include "put/visit.h"
 
@@ -14,7 +15,7 @@ struct req_start_generation
 
 struct res_start_generation
 {
-    std::optional<std::string> error_desc;
+    bout::result<void, std::string> res = bout::success();
 };
 
 struct req_stop_generation
@@ -23,8 +24,7 @@ struct req_stop_generation
 
 struct res_stop_generation
 {
-    // TODO: The summary stats should be added here
-    std::optional<std::string> error_desc;
+    bout::result<mgmt::summary_stats, std::string> res = mgmt::summary_stats{};
 };
 
 struct stats_report

@@ -7,6 +7,7 @@
 #include "log/log.h"
 #include "mgmt/gen_config.h"
 #include "mgmt/messages.h"
+#include "mgmt/stats.h"
 #include "put/tg_assert.h"
 #include "put/time_utils.h"
 
@@ -43,7 +44,7 @@ class manager_impl
 
     std::vector<rte_mbuf*> tx_pkts_;
 
-    uint64_t tx_pkts_drop_ = 0;
+    uint64_t cnt_tx_pkts_qfull_ = 0;
 
     const stdfs::path working_dir_;
 
@@ -124,7 +125,8 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
                msg.cfg->duration(), msg.cfg->flows_configs().size());
     if (generation_started()) {
         TGLOG_INFO("Generation already started\n");
-        out_queue_->enqueue(mgmt::res_start_generation{"Already started"});
+        out_queue_->enqueue(
+            mgmt::res_start_generation{.res = "Already started"});
         return;
     }
 
@@ -137,11 +139,19 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         }
     } catch (const std::exception& ex) {
         TGLOG_INFO("Failed to create flows generator: {}\n", ex.what());
-        out_queue_->enqueue(mgmt::res_start_generation{ex.what()});
+        out_queue_->enqueue(mgmt::res_start_generation{.res = ex.what()});
         return;
     }
     TG_ENFORCE(generators_.empty());
     generators_ = std::move(gens);
+
+    // Every generation run should report summary stats only from its own run
+    if (const int err = rte_eth_stats_reset(nic_port_id); err == 0) {
+        cnt_tx_pkts_qfull_ = 0;
+    } else {
+        TGLOG_ERROR("Failed to reset the ethernet device stats: ({}) {}\n",
+                    -err, ::strerrordesc_np(-err));
+    }
 
     TG_ENFORCE(!gen_ticks_);
     gen_ticks_.emplace(gen_ticks{
@@ -157,15 +167,27 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
 
 void manager_impl::on_inc_msg(mgmt::req_stop_generation&&) noexcept
 {
+    // The generation stop request is always fully processed so that the
+    // summary stats can be reported via the response.
     TGLOG_INFO("Got request to stop generation\n");
-    if (!generation_started()) {
-        TGLOG_INFO("Generation already stopped\n");
-        out_queue_->enqueue(mgmt::res_stop_generation{"Already stopped"});
-        return;
-    }
+
     stop_generation();
-    // TODO: Send summary stats
-    out_queue_->enqueue(mgmt::res_stop_generation{});
+
+    rte_eth_stats tmp = {};
+    rte_eth_stats_get(nic_port_id, &tmp);
+
+    out_queue_->enqueue(
+        mgmt::res_stop_generation{.res = mgmt::summary_stats{
+                                      .cnt_rx_pkts_        = tmp.ipackets,
+                                      .cnt_tx_pkts_        = tmp.opackets,
+                                      .cnt_rx_bytes_       = tmp.ibytes,
+                                      .cnt_tx_bytes_       = tmp.obytes,
+                                      .cnt_rx_pkts_qfull_  = tmp.imissed,
+                                      .cnt_rx_pkts_nombuf_ = tmp.rx_nombuf,
+                                      .cnt_tx_pkts_qfull_  = cnt_tx_pkts_qfull_,
+                                      .cnt_rx_pkts_err_    = tmp.ierrors,
+                                      .cnt_tx_pkts_err_    = tmp.oerrors,
+                                  }});
 }
 
 void manager_impl::stop_generation() noexcept
@@ -195,7 +217,7 @@ void manager_impl::transmit_tx_pkts() noexcept
     if (const auto cnt_all = tx_pkts_.size(); cnt_all > cnt) {
         const auto cnt_drop = cnt_all - cnt;
         rte_pktmbuf_free_bulk(&tx_pkts_[cnt], cnt_drop);
-        tx_pkts_drop_ += cnt_drop;
+        cnt_tx_pkts_qfull_ += cnt_drop;
         TGLOG_ERROR("Dropped {} of {} on transmit\n", cnt_drop, cnt_all);
     }
     tx_pkts_.clear();

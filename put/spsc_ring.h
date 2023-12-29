@@ -239,7 +239,7 @@ public: // These functions should be called only from the consumer thread
     // exception and thus the requirements for this function are stronger.
     template <typename U>
     size_type try_pop(U* to, size_type sz) noexcept
-        requires(std::is_nothrow_assignable_v<U&, T &&>)
+    // requires(std::is_nothrow_assignable_v<U&, T &&>)
     {
         return try_consume(
             [to, sz](value_type* v, size_type s) mutable noexcept {
