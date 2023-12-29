@@ -135,7 +135,8 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
     try {
         for (const auto& cap_cfg : msg.cfg->flows_configs()) {
             gens.push_back(std::make_unique<flows_generator_type>(
-                cap_cfg, msg.cfg->dut_address(), &time_events_));
+                cap_cfg, working_dir_, msg.cfg->dut_address(), pool_.pool(),
+                &time_events_));
         }
     } catch (const std::exception& ex) {
         TGLOG_INFO("Failed to create flows generator: {}\n", ex.what());
