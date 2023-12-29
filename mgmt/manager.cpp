@@ -184,9 +184,17 @@ void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
 void manager_impl::on_inc_msg(mgmt::res_stop_generation&& msg) noexcept
 {
     TG_ENFORCE(stop_cb_);
-    if (msg.res) {
+    if (!msg.res) {
         TGLOG_INFO("Successfully stopped generation\n");
-        // TODO:
+        // TODO: Print the remaining of the detailed stats, if any.
+        std::string body;
+        body.reserve(1024);
+        body += R"({"result": {")";
+        msg.res.value().visit([&](std::string_view nam, auto val) {
+            fmt::format_to(std::back_inserter(body), "\"{}\":{},", nam, val);
+        });
+        body += R"("}})";
+        stop_cb_(bhttp::status::ok, std::move(body));
     } else {
         TGLOG_INFO("Failed to stop generation: {}\n", msg.res.error());
         stop_cb_(bhttp::status::precondition_failed,
