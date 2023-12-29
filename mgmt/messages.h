@@ -14,7 +14,7 @@ struct req_start_generation
 
 struct res_start_generation
 {
-    bout::result<void> res = bout::success();
+    std::optional<std::string> error_desc;
 };
 
 struct req_stop_generation
@@ -24,7 +24,7 @@ struct req_stop_generation
 struct res_stop_generation
 {
     // TODO: The summary stats should be added here
-    bout::result<void> res = bout::success();
+    std::optional<std::string> error_desc;
 };
 
 struct stats_report
