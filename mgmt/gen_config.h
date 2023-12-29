@@ -3,24 +3,22 @@
 namespace mgmt
 {
 
+struct flows_config
+{
+    stdfs::path name;
+    uint32_t burst;
+    uint32_t flows_per_sec;
+    std::optional<stdcr::microseconds> inter_pkts_gap;
+    baio_ip_net4 cln_ips;
+    baio_ip_net4 srv_ips;
+    std::optional<uint16_t> cln_port;
+};
+
 class gen_config
 {
-public:
-    struct cap_cfg
-    {
-        stdfs::path name;
-        uint32_t burst;
-        uint32_t streams_per_sec;
-        std::optional<stdcr::microseconds> inter_pkts_gap;
-        baio_ip_net4 cln_ips;
-        baio_ip_net4 srv_ips;
-        std::optional<uint16_t> cln_port;
-    };
-
-private:
     stdcr::milliseconds duration_;
     rte_ether_addr dut_addr_;
-    std::vector<cap_cfg> cap_cfgs_;
+    std::vector<flows_config> flows_cfgs_;
 
 public:
     explicit gen_config(std::string_view);
@@ -36,7 +34,10 @@ public:
 
     rte_ether_addr dut_address() const noexcept { return dut_addr_; }
     stdcr::milliseconds duration() const noexcept { return duration_; }
-    std::span<const cap_cfg> cap_configs() const noexcept { return cap_cfgs_; }
+    std::span<const flows_config> flows_configs() const noexcept
+    {
+        return flows_cfgs_;
+    }
 };
 
 } // namespace mgmt

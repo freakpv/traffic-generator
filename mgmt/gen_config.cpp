@@ -14,7 +14,7 @@
  * directory given in the generator configuration file.
  * `burst` - value 1 means that no burst will be generated, if value > 1 so many
  * streams will be generated in a burst
- * `sps` - started/generated streams per second. Should be 1 or more
+ * `fps` - started/generated flows per second. Should be 1 or more
  * `ipg` - inter packet gaps in micro-seconds. If not present the time-
  * stamps from the capture file will be used
  * `cln_ips` - range of IPv4 addresses to be used for the "client" packets
@@ -28,7 +28,7 @@
         {
             "name": "test.pcap",
             "burst": 1,
-            "sps": 1,
+            "fps": 1,
             "ipg": 10000,
             "cln_ips": "16.0.0.1/29",
             "srv_ips": "48.0.0.1/29",
@@ -37,7 +37,7 @@
         {
             "name": "test2.pcap",
             "burst": 1,
-            "sps": 1,
+            "fps": 1,
             "ipg": 10000,
             "cln_ips": "16.0.0.1/29",
             "srv_ips": "48.0.0.1/29",
@@ -79,12 +79,12 @@ gen_config::gen_config(std::string_view cfg_info)
         return std::nullopt;
     };
 
-    std::vector<cap_cfg> cap_cfgs;
+    std::vector<flows_config> flows_cfgs;
     for (const auto& cap : captures) {
         const auto& cap_obj     = cap.as_object();
         const auto& name_str    = cap_obj.at("name").as_string();
         const auto burst_num    = cap_obj.at("burst").as_uint64();
-        const auto sps_num      = cap_obj.at("sps").as_uint64();
+        const auto fps_num      = cap_obj.at("fps").as_uint64();
         const auto ipg_num      = load_opt_u64(cap_obj, "ipg");
         const auto& cln_ips_str = cap_obj.at("cln_ips").as_string();
         const auto& srv_ips_str = cap_obj.at("cln_ips").as_string();
@@ -95,13 +95,13 @@ gen_config::gen_config(std::string_view cfg_info)
             put::throw_runtime_error(
                 "The `burst` value must be between 1 and 5");
         }
-        if (!put::in_range_inclusive(sps_num, 1ul, 1'000'000ul)) {
-            put::throw_runtime_error("The `streams_per_second (sps)` value "
+        if (!put::in_range_inclusive(fps_num, 1ul, 1'000'000ul)) {
+            put::throw_runtime_error("The `flows_per_second (fps)` value "
                                      "must be between 1 and 1'000'000");
         }
-        if (ipg_num && !put::in_range_inclusive(*ipg_num, 1ul, 100'000'000ul)) {
-            put::throw_runtime_error("The `streams_per_second (sps)` value "
-                                     "must be between 1 and 100'000'000");
+        if (ipg_num && !put::in_range_inclusive(*ipg_num, 1ul, 1'000'000ul)) {
+            put::throw_runtime_error("The `inter_packet_gaps (ipg)` value "
+                                     "must be between 1 and 1'000'000");
         }
         if (cln_port_num &&
             !put::in_range_inclusive(*cln_port_num, 1024ul, 65535ul)) {
@@ -121,20 +121,20 @@ gen_config::gen_config(std::string_view cfg_info)
         }
 
         using ipg_type = std::optional<stdcr::microseconds>;
-        cap_cfgs.push_back(cap_cfg{
-            .name            = std::string_view(name_str),
-            .burst           = static_cast<uint32_t>(burst_num),
-            .streams_per_sec = static_cast<uint32_t>(sps_num),
-            .inter_pkts_gap  = ipg_num ? ipg_type(*ipg_num) : ipg_type{},
-            .cln_ips         = cln_ips,
-            .srv_ips         = srv_ips,
-            .cln_port        = cln_port_num,
+        flows_cfgs.push_back(flows_config{
+            .name           = std::string_view(name_str),
+            .burst          = static_cast<uint32_t>(burst_num),
+            .flows_per_sec  = static_cast<uint32_t>(fps_num),
+            .inter_pkts_gap = ipg_num ? ipg_type(*ipg_num) : ipg_type{},
+            .cln_ips        = cln_ips,
+            .srv_ips        = srv_ips,
+            .cln_port       = cln_port_num,
         });
     }
 
-    duration_ = stdcr::milliseconds(static_cast<uint64_t>(dur_num * 1000));
-    dut_addr_ = *dut_addr;
-    cap_cfgs_ = std::move(cap_cfgs);
+    duration_   = stdcr::milliseconds(static_cast<uint64_t>(dur_num * 1000));
+    dut_addr_   = *dut_addr;
+    flows_cfgs_ = std::move(flows_cfgs);
 }
 
 gen_config::~gen_config() noexcept                            = default;
