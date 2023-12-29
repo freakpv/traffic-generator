@@ -64,22 +64,25 @@ tcap_loader::load_pkt(put::fun_ref<rte_mbuf*()> alloc_mbuf) noexcept
     rte_mbuf* head = alloc_mbuf();
     rte_mbuf* curr = head;
     rte_mbuf* prev = nullptr;
+    if (!head) return put::system_error_code(ENOMEM);
+    stdex::scope_exit exit_guard([head] { rte_pktmbuf_free(head); });
     for (uint32_t rdlen = 0; rdlen < hdr.caplen; prev = curr) {
         if (prev) {
-            curr       = alloc_mbuf();
+            curr = alloc_mbuf();
+            if (!curr) return put::system_error_code(ENOMEM);
             prev->next = curr;
             head->nb_segs++;
         }
         const auto len =
             std::min<uint32_t>(hdr.caplen - rdlen, rte_pktmbuf_tailroom(curr));
         if (::fread(rte_pktmbuf_mtod(curr, char*), len, 1, file_.get()) != 1) {
-            rte_pktmbuf_free(head);
             return put::system_error_code(errno);
         }
         curr->data_len = len;
         head->pkt_len += len;
         rdlen += len;
     }
+    exit_guard.release();
     return pkt{
         .tstamp = stdcr::microseconds((hdr.sec * 1'000'000ull) + hdr.usec),
         .mbuf   = head,

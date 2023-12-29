@@ -31,6 +31,8 @@ public:
     };
     bout::result<pkt> load_pkt(put::fun_ref<rte_mbuf*()>) noexcept;
 
+    bool is_eof() const noexcept { return ::feof(file_.get()); }
+
     bool is_valid() const noexcept { return !!file_; }
 };
 
