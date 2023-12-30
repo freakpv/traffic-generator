@@ -1,4 +1,5 @@
 #include "gen/priv/flows_generator.h"
+#include "gen/priv/generation_ops.h"
 #include "gen/priv/tcap_loader.h"
 
 #include "put/throw.h"
@@ -19,7 +20,7 @@ namespace gen::priv
 
 flows_generator::flows_generator(const config& cfg)
 {
-    auto alloc_mbuf = [&] { return rte_pktmbuf_alloc(cfg.mbufs_pool); };
+    auto alloc_mbuf = [ops = cfg.gen_ops] { return ops->alloc_mbuf(); };
 
     decltype(pkts_) pkts;
     std::optional<stdcr::microseconds> first_tstamp; // For the relative time
@@ -33,7 +34,7 @@ flows_generator::flows_generator(const config& cfg)
         if (!first_tstamp) first_tstamp = pk.tstamp;
         pkts.push_back(pkt{
             .rel_tsc = put::duration_to_tsc(pk.tstamp - *first_tstamp),
-            .mbuf    = pk.mbuf,
+            .mbuf    = mbuf_ptr_type(pk.mbuf),
         });
     }
 
@@ -43,12 +44,9 @@ flows_generator::flows_generator(const config& cfg)
     pkts_ = std::move(pkts);
 }
 
-flows_generator::~flows_generator() noexcept
-{
-    for (auto pk : pkts_) rte_pktmbuf_free(pk.mbuf);
-    pkts_.clear();
-
-    // TODO:
-}
+flows_generator::~flows_generator() noexcept                 = default;
+flows_generator::flows_generator(flows_generator&&) noexcept = default;
+flows_generator&
+flows_generator::operator=(flows_generator&&) noexcept = default;
 
 } // namespace gen::priv

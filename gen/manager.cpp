@@ -1,8 +1,9 @@
 #include "gen/manager.h"
 #include "gen/priv/eth_dev.h"
 #include "gen/priv/flows_generator.h"
+#include "gen/priv/generation_ops.h"
 #include "gen/priv/mbuf_pool.h"
-#include "gen/priv/time_event_scheduler.h"
+#include "gen/priv/event_scheduler.h"
 
 #include "log/log.h"
 #include "mgmt/gen_config.h"
@@ -14,7 +15,7 @@
 namespace gen // generator
 {
 
-class manager_impl
+class manager_impl final : public gen::priv::generation_ops
 {
     using config_type = manager::config;
 
@@ -22,18 +23,17 @@ class manager_impl
     static constexpr uint16_t nic_port_id  = 0;
     static constexpr size_t cnt_burst_pkts = 64;
 
-    gen::priv::mbuf_pool pool_;
-    gen::priv::eth_dev if_;
+    gen::priv::mbuf_pool mbuf_pool_;
+    gen::priv::eth_dev eth_dev_;
     mgmt::out_messages_queue* inc_queue_;
     mgmt::inc_messages_queue* out_queue_;
 
     // The event scheduler needs to be destroyed after the generators because
     // the latter use the timer subsystem.
-    gen::priv::time_event_scheduler time_events_;
+    gen::priv::event_scheduler scheduler_;
 
-    using flows_generator_type     = gen::priv::flows_generator;
-    using flows_generator_ptr_type = std::unique_ptr<flows_generator_type>;
-    std::vector<flows_generator_ptr_type> generators_;
+    using flows_generator_type = gen::priv::flows_generator;
+    std::vector<flows_generator_type> generators_;
 
     struct gen_ticks
     {
@@ -50,6 +50,7 @@ class manager_impl
 
 public:
     manager_impl(const config_type&);
+    ~manager_impl() noexcept override = default;
 
     void process_events() noexcept;
 
@@ -61,19 +62,23 @@ private:
     bool generation_started() const noexcept { return !!gen_ticks_; }
 
 private:
-    void send_pkt(rte_mbuf*) noexcept;
     void transmit_tx_pkts() noexcept;
     void receive_rx_pkts() noexcept;
+
+private: // The `generation_ops` interface
+    rte_mbuf* alloc_mbuf() noexcept override;
+    rte_mbuf* copy_pkt(rte_mbuf*) noexcept override;
+    void send_pkt(rte_mbuf*) noexcept override;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 manager_impl::manager_impl(const config_type& cfg)
-: pool_({.cnt_mbufs = cfg.max_cnt_mbufs, .socket_id = rte_socket_id()})
-, if_({.port_id    = nic_port_id,
-       .queue_size = cfg.nic_queue_size,
-       .socket_id  = rte_socket_id(),
-       .mempool    = pool_.pool()})
+: mbuf_pool_({.cnt_mbufs = cfg.max_cnt_mbufs, .socket_id = rte_socket_id()})
+, eth_dev_({.port_id    = nic_port_id,
+            .queue_size = cfg.nic_queue_size,
+            .socket_id  = rte_socket_id(),
+            .mempool    = mbuf_pool_.pool()})
 , inc_queue_(cfg.inc_queue)
 , out_queue_(cfg.out_queue)
 , working_dir_(cfg.working_dir)
@@ -97,7 +102,7 @@ void manager_impl::process_events() noexcept
     // as a result no functionality should generate packets for transmission.
     if (!generation_started()) {
         TG_ENFORCE(tx_pkts_.empty() == true);
-        TG_ENFORCE(time_events_.count_events() == 0);
+        TG_ENFORCE(scheduler_.count_events() == 0);
         return;
     }
 
@@ -111,7 +116,7 @@ void manager_impl::process_events() noexcept
     }
 
     // This call may generate packets for transmission and statistics
-    time_events_.process_events();
+    scheduler_.process_events();
 
     // We need to transmit the packets which have been enqueued for sending
     // during this cycle of `process_events`. We need to keep the latency as
@@ -130,25 +135,24 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         return;
     }
 
-    std::vector<flows_generator_ptr_type> gens;
+    std::vector<flows_generator_type> gens;
     gens.reserve(msg.cfg->flows_configs().size());
     try {
-        const auto src_addr = if_.get_mac_addr();
-        for (const auto& cap_cfg : msg.cfg->flows_configs()) {
-            gens.push_back(std::make_unique<flows_generator_type>(
-                flows_generator_type::config{
-                    .cap_fpath      = working_dir_ / cap_cfg.name,
-                    .src_addr       = src_addr,
-                    .dst_addr       = msg.cfg->dut_address(),
-                    .burst          = cap_cfg.burst,
-                    .flows_per_sec  = cap_cfg.flows_per_sec,
-                    .inter_pkts_gap = cap_cfg.inter_pkts_gap,
-                    .cln_ips        = cap_cfg.cln_ips,
-                    .srv_ips        = cap_cfg.srv_ips,
-                    .cln_port       = cap_cfg.cln_port,
-                    .mbufs_pool     = pool_.pool(),
-                    .scheduler      = &time_events_,
-                }));
+        const auto cln_ether_addr = eth_dev_.get_mac_addr();
+        for (size_t idx = 0; const auto& cap_cfg : msg.cfg->flows_configs()) {
+            gens.emplace_back(flows_generator_type::config{
+                .idx            = idx++,
+                .cap_fpath      = working_dir_ / cap_cfg.name,
+                .cln_ether_addr = cln_ether_addr,
+                .srv_ether_addr = msg.cfg->dut_address(),
+                .burst          = cap_cfg.burst,
+                .flows_per_sec  = cap_cfg.flows_per_sec,
+                .inter_pkts_gap = cap_cfg.inter_pkts_gap,
+                .cln_ip_addrs   = cap_cfg.cln_ips,
+                .srv_ip_addrs   = cap_cfg.srv_ips,
+                .cln_port       = cap_cfg.cln_port,
+                .gen_ops        = this,
+            });
         }
     } catch (const std::exception& ex) {
         TGLOG_INFO("Failed to create flows generator: {}\n", ex.what());
@@ -209,7 +213,7 @@ void manager_impl::stop_generation() noexcept
 
     // Removing the generators should automatically remove all registered timers
     // because every generator should unregister its timers upon destruction.
-    TG_ENFORCE(time_events_.count_events() == 0);
+    TG_ENFORCE(scheduler_.count_events() == 0);
 
     gen_ticks_.reset();
 
@@ -218,15 +222,9 @@ void manager_impl::stop_generation() noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void manager_impl::send_pkt(rte_mbuf* mbuf) noexcept
-{
-    tx_pkts_.push_back(mbuf);
-    if (tx_pkts_.size() == cnt_burst_pkts) transmit_tx_pkts();
-}
-
 void manager_impl::transmit_tx_pkts() noexcept
 {
-    const auto cnt = if_.transmit_pkts(tx_pkts_);
+    const auto cnt = eth_dev_.transmit_pkts(tx_pkts_);
     if (const auto cnt_all = tx_pkts_.size(); cnt_all > cnt) {
         const auto cnt_drop = cnt_all - cnt;
         rte_pktmbuf_free_bulk(&tx_pkts_[cnt], cnt_drop);
@@ -239,9 +237,27 @@ void manager_impl::transmit_tx_pkts() noexcept
 void manager_impl::receive_rx_pkts() noexcept
 {
     rte_mbuf* pkts[cnt_burst_pkts];
-    if (const auto cnt = if_.receive_pkts(pkts); cnt > 0) {
+    if (const auto cnt = eth_dev_.receive_pkts(pkts); cnt > 0) {
         rte_pktmbuf_free_bulk(pkts, cnt);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+rte_mbuf* manager_impl::alloc_mbuf() noexcept
+{
+    return rte_pktmbuf_alloc(mbuf_pool_.pool());
+}
+
+rte_mbuf* manager_impl::copy_pkt(rte_mbuf* pkt) noexcept
+{
+    return rte_pktmbuf_copy(pkt, mbuf_pool_.pool(), 0, pkt->pkt_len);
+}
+
+void manager_impl::send_pkt(rte_mbuf* pkt) noexcept
+{
+    tx_pkts_.push_back(pkt);
+    if (tx_pkts_.size() == cnt_burst_pkts) transmit_tx_pkts();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
