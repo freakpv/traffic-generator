@@ -20,11 +20,11 @@ void validate(boost::any& out,
         put::throw_runtime_error("No port in endpoint: {}", val);
     }
     bsys::error_code ec;
-    baio_ip_addr addr = baio::ip::make_address(parts[1], ec);
+    const auto addr = baio::ip::make_address_v4(parts[1], ec);
     if (ec) {
         put::throw_runtime_error("Invalid address in endpoint: {}", val);
     }
-    std::optional port = put::str_to_int<uint16_t>(parts[2]);
+    const std::optional port = put::str_to_int<uint16_t>(parts[2]);
     if (!port) {
         put::throw_runtime_error("Invalid port in endpoint: {}", val);
     }

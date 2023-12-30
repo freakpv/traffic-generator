@@ -23,9 +23,12 @@
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_ether.h>
+#include <rte_ip.h>
 #include <rte_launch.h>
 #include <rte_mbuf.h>
+#include <rte_tcp.h>
 #include <rte_timer.h>
+#include <rte_udp.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // c++ standard library headers
@@ -63,6 +66,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/container/flat_map.hpp>
+#include <boost/endian/conversion.hpp>
 #include <boost/json/parser.hpp>
 #include <boost/json/value.hpp>
 #include <boost/mp11/algorithm.hpp>

@@ -18,7 +18,12 @@ public:
     {
         uint64_t rel_tsc; // relative timestamp in TSC cycles
         mbuf_ptr_type mbuf;
+        bool from_cln; // true - client to server, false - server to client
     };
+    // The scheduler event notifications are fired for given flow instance and
+    // upon receiving such notification we need to do some things in the
+    // flows generator intself and thus we need to keep a pointer to it in every
+    // flow entry.
     struct flow
     {
         uint32_t idx;
@@ -27,6 +32,7 @@ public:
         baio_ip_addr4 srv_ip_addr;
         uint64_t rel_tsc_first_pkt;
         event_handle event;
+        flows_generator* parent;
     };
 
 private:
@@ -42,23 +48,18 @@ private:
     // However, the member of each flow are modified to track the flow state
     std::vector<flow> flows_;
 
+    // These members are never changed once set upon construction
+    gen::priv::generation_ops* gen_ops_;
+    baio_ip_addr4_rng cln_ip_addrs_;
+    baio_ip_addr4_rng srv_ip_addrs_;
+    size_t idx_;
+
     // These members are used to handle the burst functionality and they
     // are changed during runtime, except the burst count.
     baio_ip_addr4 cln_ip_addr_;
     baio_ip_addr4 srv_ip_addr_;
     uint32_t burst_idx_;
     uint32_t burst_cnt_;
-
-    // These members are never changed once set upon construction
-    rte_ether_addr cln_ether_addr_;
-    rte_ether_addr srv_ether_addr_;
-    baio_ip_net4 cln_ip_addrs_;
-    baio_ip_net4 srv_ip_addrs_;
-    std::optional<uint16_t> cln_port_;
-
-    // These members are never changed once set upon construction
-    size_t idx_;
-    gen::priv::generation_ops* gen_ops_;
 
 public:
     struct config
