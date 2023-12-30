@@ -35,4 +35,34 @@ public:
     }
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Very primitive callback helper type
+// Don't want to add fully fledged in_place function or something like that
+template <typename T>
+class callback;
+
+template <typename Ret, typename... Args>
+class callback<Ret(Args...)> final
+{
+public:
+    using ctx_ptr_type = void*;
+    using fun_ptr_type = Ret (*)(ctx_ptr_type, Args...);
+
+private:
+    ctx_ptr_type ctx_ = nullptr;
+    fun_ptr_type fun_ = nullptr;
+
+public:
+    callback() noexcept = default;
+
+    callback(ctx_ptr_type ctx, fun_ptr_type fun) noexcept : ctx_(ctx), fun_(fun)
+    {
+    }
+
+    Ret operator()(Args... args) const
+    {
+        return fun_(ctx_, std::forward<Args>(args)...);
+    }
+};
+
 } // namespace put

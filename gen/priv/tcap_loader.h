@@ -1,6 +1,6 @@
 #pragma once
 
-#include "put/fun_ref.h"
+#include "put/functional.h"
 
 namespace gen::priv
 {
