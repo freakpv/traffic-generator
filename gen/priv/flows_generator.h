@@ -18,12 +18,25 @@ class flows_generator
     };
     std::vector<pkt> pkts_;
     // TODO:
+
 public:
-    flows_generator(const mgmt::flows_config&,
-                    const stdfs::path&,
-                    const rte_ether_addr&,
-                    rte_mempool*,
-                    event_scheduler*);
+    struct config
+    {
+        stdfs::path cap_fpath;
+        rte_ether_addr src_addr;
+        rte_ether_addr dst_addr;
+        uint32_t burst;
+        uint32_t flows_per_sec;
+        std::optional<stdcr::microseconds> inter_pkts_gap;
+        baio_ip_net4 cln_ips;
+        baio_ip_net4 srv_ips;
+        std::optional<uint16_t> cln_port;
+        rte_mempool* mbufs_pool;
+        event_scheduler* scheduler;
+    };
+
+public:
+    explicit flows_generator(const config&);
     ~flows_generator() noexcept;
 
     flows_generator()                                  = delete;

@@ -1,9 +1,6 @@
 #include "gen/priv/flows_generator.h"
 #include "gen/priv/tcap_loader.h"
 
-// TODO: Remove this dependency by using own config
-#include "mgmt/gen_config.h"
-
 #include "put/throw.h"
 #include "put/time_utils.h"
 
@@ -20,22 +17,17 @@ namespace gen::priv
     }
 */
 
-flows_generator::flows_generator(const mgmt::flows_config& cfg,
-                                 const stdfs::path& pcaps_dir,
-                                 const rte_ether_addr&,
-                                 rte_mempool* pool,
-                                 event_scheduler*)
+flows_generator::flows_generator(const config& cfg)
 {
-    auto alloc_mbuf = [pool] { return rte_pktmbuf_alloc(pool); };
+    auto alloc_mbuf = [&] { return rte_pktmbuf_alloc(cfg.mbufs_pool); };
 
     decltype(pkts_) pkts;
-    const auto fpath = pcaps_dir / cfg.name;
     std::optional<stdcr::microseconds> first_tstamp; // For the relative time
-    for (gen::priv::tcap_loader tcap(fpath); !tcap.is_eof();) {
+    for (gen::priv::tcap_loader tcap(cfg.cap_fpath); !tcap.is_eof();) {
         const auto res = tcap.load_pkt(alloc_mbuf);
         if (!res) {
-            put::throw_system_error(res.error(),
-                                    "Failed to load packet from {}", fpath);
+            put::throw_system_error(
+                res.error(), "Failed to load packet from {}", cfg.cap_fpath);
         }
         const auto& pk = res.value();
         if (!first_tstamp) first_tstamp = pk.tstamp;

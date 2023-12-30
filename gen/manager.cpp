@@ -133,10 +133,22 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
     std::vector<flows_generator_ptr_type> gens;
     gens.reserve(msg.cfg->flows_configs().size());
     try {
+        const auto src_addr = if_.get_mac_addr();
         for (const auto& cap_cfg : msg.cfg->flows_configs()) {
             gens.push_back(std::make_unique<flows_generator_type>(
-                cap_cfg, working_dir_, msg.cfg->dut_address(), pool_.pool(),
-                &time_events_));
+                flows_generator_type::config{
+                    .cap_fpath      = working_dir_ / cap_cfg.name,
+                    .src_addr       = src_addr,
+                    .dst_addr       = msg.cfg->dut_address(),
+                    .burst          = cap_cfg.burst,
+                    .flows_per_sec  = cap_cfg.flows_per_sec,
+                    .inter_pkts_gap = cap_cfg.inter_pkts_gap,
+                    .cln_ips        = cap_cfg.cln_ips,
+                    .srv_ips        = cap_cfg.srv_ips,
+                    .cln_port       = cap_cfg.cln_port,
+                    .mbufs_pool     = pool_.pool(),
+                    .scheduler      = &time_events_,
+                }));
         }
     } catch (const std::exception& ex) {
         TGLOG_INFO("Failed to create flows generator: {}\n", ex.what());
