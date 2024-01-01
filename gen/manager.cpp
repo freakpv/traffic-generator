@@ -164,7 +164,7 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         return;
     }
 
-    // TODO: Debug log the generated flows.
+    // TODO: Debug log the prepared flows.
 
     TG_ENFORCE(generators_.empty());
     generators_ = std::move(gens);
@@ -275,7 +275,7 @@ void manager_impl::send_pkt(rte_mbuf* pkt) noexcept
 
 gen::priv::event_handle manager_impl::create_scheduler_event() noexcept
 {
-    return scheduler_.create_event();
+    return gen::priv::event_handle(&scheduler_);
 }
 
 void manager_impl::do_report(const gen::priv::generation_report&) noexcept
