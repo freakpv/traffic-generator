@@ -13,17 +13,18 @@ struct summary_stats
     MACRO(uint64_t, cnt_rx_pkts_qfull)  \
     MACRO(uint64_t, cnt_rx_pkts_nombuf) \
     MACRO(uint64_t, cnt_tx_pkts_qfull)  \
+    MACRO(uint64_t, cnt_tx_pkts_nombuf) \
     MACRO(uint64_t, cnt_rx_pkts_err)    \
     MACRO(uint64_t, cnt_tx_pkts_err)
 
-#define XXX(type, name) type name##_ = 0;
+#define XXX(type, name) type name = 0;
     TG_COUNTERS(XXX)
 #undef XXX
 
     template <typename Visitor>
     void visit(Visitor&& vis) const noexcept
     {
-#define XXX(type, name) vis(#name, name##_);
+#define XXX(type, name) vis(#name, name);
         TG_COUNTERS(XXX)
 #undef XXX
     }

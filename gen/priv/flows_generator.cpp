@@ -134,17 +134,9 @@ static auto setup_flows(baio_ip_addr4_rng cln_ip_addrs,
                         baio_ip_addr4_rng srv_ip_addrs,
                         uint32_t flows_per_sec,
                         uint32_t burst_cnt,
-                        flows_generator* fgen)
+                        flows_generator* fgen) noexcept
 {
     TG_ENFORCE(burst_cnt >= 1);
-
-    using namespace std::chrono_literals;
-    const auto flow_tsc_step = put::duration_to_tsc(
-        stdcr::duration_cast<stdcr::microseconds>(1s) / flows_per_sec);
-    if (flow_tsc_step == 0) {
-        put::throw_runtime_error(
-            "Can't work with so many ({}) flows per second", flows_per_sec);
-    }
 
     std::vector<flows_generator::flow> flows;
     flows.reserve(flows_per_sec);
@@ -153,15 +145,14 @@ static auto setup_flows(baio_ip_addr4_rng cln_ip_addrs,
     auto srv_ip_addr   = srv_ip_addrs.begin();
     uint32_t burst_idx = 0;
 
-    for (uint64_t flow_tsc = 0; auto i : boost::irange(flows_per_sec)) {
+    for (auto i : boost::irange(flows_per_sec)) {
         flows.push_back(flows_generator::flow{
-            .idx               = i,
-            .pkt_idx           = 0, // always start from the 1st packet
-            .cln_ip_addr       = *cln_ip_addr,
-            .srv_ip_addr       = *srv_ip_addr,
-            .rel_tsc_first_pkt = flow_tsc,
-            .event             = {}, // We'll be set later
-            .fgen              = fgen,
+            .idx         = i,
+            .pkt_idx     = 0, // always start from the 1st packet
+            .cln_ip_addr = *cln_ip_addr,
+            .srv_ip_addr = *srv_ip_addr,
+            .event       = {}, // We'll be set later
+            .fgen        = fgen,
         });
         // All streams from a given burst are with the same client and server
         // addresses. The addresses change for the next burst.
@@ -169,7 +160,6 @@ static auto setup_flows(baio_ip_addr4_rng cln_ip_addrs,
             inc_reset(cln_ip_addr, cln_ip_addrs.begin(), cln_ip_addrs.end());
             inc_reset(srv_ip_addr, srv_ip_addrs.begin(), srv_ip_addrs.end());
         }
-        flow_tsc += flow_tsc_step;
     }
 
     return std::tuple(std::move(flows), cln_ip_addr, srv_ip_addr, burst_idx);
@@ -204,15 +194,25 @@ flows_generator::flows_generator(flows_generator&&) noexcept = default;
 flows_generator&
 flows_generator::operator=(flows_generator&&) noexcept = default;
 
-void flows_generator::setup_flow_events() noexcept
+void flows_generator::setup_flow_events()
 {
+    // The flows need to be evenly spread through out the second
+    using namespace std::chrono_literals;
+    const auto flow_tsc_step =
+        put::duration_to_tsc(stdcr::microseconds{1'000'000us / flows_.size()});
+    if (flow_tsc_step == 0) {
+        put::throw_runtime_error(
+            "Can't work with so many ({}) flows per second", flows_.size());
+    }
+
     // TODO: Optimization
     // For the case of working with predefined inter packet gaps we can
     // schedule periodic event only once.
-    for (auto& flow : flows_) {
-        const auto evtm = flow.rel_tsc_first_pkt + pkts_[flow.pkt_idx].rel_tsc;
+    for (uint64_t flow_tsc = 0; auto& flow : flows_) {
+        const auto evtm = flow_tsc + pkts_[flow.pkt_idx].rel_tsc;
         flow.event      = gen_ops_->create_scheduler_event();
         flow.event.schedule_single(evtm, on_event, &flow);
+        flow_tsc += flow_tsc_step;
     }
 }
 
@@ -229,7 +229,25 @@ void flows_generator::on_flow_event(flow& fl) noexcept
             inc_reset(srv_ip_addr_, srv_ip_addrs_.begin(), srv_ip_addrs_.end());
         }
     }
-    const auto& pkt = pkts_[fl.pkt_idx];
+    const auto& pkt                 = pkts_[fl.pkt_idx];
+    const auto [src_addr, dst_addr] = [&] {
+        return pkt.from_cln
+                   ? std::pair(ben::native_to_big(fl.cln_ip_addr.to_uint()),
+                               ben::native_to_big(fl.srv_ip_addr.to_uint()))
+                   : std::pair(ben::native_to_big(fl.srv_ip_addr.to_uint()),
+                               ben::native_to_big(fl.cln_ip_addr.to_uint()));
+    }();
+    generation_report report = {
+        .tstamp_tsc = rte_get_tsc_cycles(),
+        .flow_idx   = fl.idx,
+        .pkt_idx    = fl.pkt_idx,
+        .pkt_len    = pkt.mbuf->pkt_len,
+        .src_addr   = in_addr{src_addr},
+        .dst_addr   = in_addr{dst_addr},
+        .from_cln   = pkt.from_cln,
+        .ok         = true,
+    };
+    // TODO: Optimization
     // The copy of the whole packet here is really unfortunate.
     // It's needed because we are going to change the client and server
     // addresses in the IP header. Other flows may do the same while the packet
@@ -242,21 +260,15 @@ void flows_generator::on_flow_event(flow& fl) noexcept
     // to be copied here.
     rte_mbuf* mbuf = gen_ops_->copy_pkt(pkt.mbuf.get());
     if (!mbuf) {
-        // TODO: stats
-        // TODO: reflect this in the CSV report somehow
+        report.ok = false;
+        gen_ops_->do_report(report);
         return;
     }
     // All packets have been checked upon loading and thus we may jump right
     // to the IP header.
-    constexpr size_t offs = RTE_ETHER_HDR_LEN;
-    auto* ih              = put::read_hdr<rte_ipv4_hdr>(mbuf, offs);
-    if (pkt.from_cln) {
-        ih->src_addr = ben::native_to_big(fl.cln_ip_addr.to_uint());
-        ih->dst_addr = ben::native_to_big(fl.srv_ip_addr.to_uint());
-    } else {
-        ih->src_addr = ben::native_to_big(fl.srv_ip_addr.to_uint());
-        ih->dst_addr = ben::native_to_big(fl.cln_ip_addr.to_uint());
-    }
+    auto* ih     = put::read_hdr<rte_ipv4_hdr>(mbuf, RTE_ETHER_HDR_LEN);
+    ih->src_addr = src_addr;
+    ih->dst_addr = dst_addr;
     // The hardware needs to (re)calculate the checksums of the packet.
     // For this we need to set the appropriate flags,
     constexpr auto flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM |
@@ -267,7 +279,7 @@ void flows_generator::on_flow_event(flow& fl) noexcept
 
     gen_ops_->send_pkt(mbuf);
 
-    // TODO: Report the sent packet with all the information for the CSV report
+    gen_ops_->do_report(report);
 
     fl.event.schedule_single(pkt.rel_tsc, on_event, &fl);
 }

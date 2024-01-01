@@ -44,7 +44,8 @@ class manager_impl final : public gen::priv::generation_ops
 
     std::vector<rte_mbuf*> tx_pkts_;
 
-    uint64_t cnt_tx_pkts_qfull_ = 0;
+    uint64_t cnt_tx_pkts_qfull_  = 0;
+    uint64_t cnt_tx_pkts_nombuf_ = 0;
 
     const stdfs::path working_dir_;
 
@@ -70,6 +71,7 @@ private: // The `generation_ops` interface
     rte_mbuf* copy_pkt(const rte_mbuf*) noexcept override;
     void send_pkt(rte_mbuf*) noexcept override;
     gen::priv::event_handle create_scheduler_event() noexcept override;
+    void do_report(const gen::priv::generation_report&) noexcept override;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +170,8 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
 
     // Every generation run should report summary stats only from its own run
     if (const int err = rte_eth_stats_reset(nic_port_id); err == 0) {
-        cnt_tx_pkts_qfull_ = 0;
+        cnt_tx_pkts_qfull_  = 0;
+        cnt_tx_pkts_nombuf_ = 0;
     } else {
         TGLOG_ERROR("Failed to reset the ethernet device stats: ({}) {}\n",
                     -err, ::strerrordesc_np(-err));
@@ -199,15 +202,16 @@ void manager_impl::on_inc_msg(mgmt::req_stop_generation&&) noexcept
 
     out_queue_->enqueue(
         mgmt::res_stop_generation{.res = mgmt::summary_stats{
-                                      .cnt_rx_pkts_        = tmp.ipackets,
-                                      .cnt_tx_pkts_        = tmp.opackets,
-                                      .cnt_rx_bytes_       = tmp.ibytes,
-                                      .cnt_tx_bytes_       = tmp.obytes,
-                                      .cnt_rx_pkts_qfull_  = tmp.imissed,
-                                      .cnt_rx_pkts_nombuf_ = tmp.rx_nombuf,
-                                      .cnt_tx_pkts_qfull_  = cnt_tx_pkts_qfull_,
-                                      .cnt_rx_pkts_err_    = tmp.ierrors,
-                                      .cnt_tx_pkts_err_    = tmp.oerrors,
+                                      .cnt_rx_pkts        = tmp.ipackets,
+                                      .cnt_tx_pkts        = tmp.opackets,
+                                      .cnt_rx_bytes       = tmp.ibytes,
+                                      .cnt_tx_bytes       = tmp.obytes,
+                                      .cnt_rx_pkts_qfull  = tmp.imissed,
+                                      .cnt_rx_pkts_nombuf = tmp.rx_nombuf,
+                                      .cnt_tx_pkts_qfull  = cnt_tx_pkts_qfull_,
+                                      .cnt_tx_pkts_nombuf = cnt_tx_pkts_nombuf_,
+                                      .cnt_rx_pkts_err    = tmp.ierrors,
+                                      .cnt_tx_pkts_err    = tmp.oerrors,
                                   }});
 }
 
@@ -250,12 +254,16 @@ void manager_impl::receive_rx_pkts() noexcept
 
 rte_mbuf* manager_impl::alloc_mbuf() noexcept
 {
-    return rte_pktmbuf_alloc(mbuf_pool_.pool());
+    rte_mbuf* ret = rte_pktmbuf_alloc(mbuf_pool_.pool());
+    if (!ret) ++cnt_tx_pkts_nombuf_;
+    return ret;
 }
 
 rte_mbuf* manager_impl::copy_pkt(const rte_mbuf* pkt) noexcept
 {
-    return rte_pktmbuf_copy(pkt, mbuf_pool_.pool(), 0, pkt->pkt_len);
+    rte_mbuf* ret = rte_pktmbuf_copy(pkt, mbuf_pool_.pool(), 0, pkt->pkt_len);
+    if (!ret) ++cnt_tx_pkts_nombuf_;
+    return ret;
 }
 
 void manager_impl::send_pkt(rte_mbuf* pkt) noexcept
@@ -267,6 +275,11 @@ void manager_impl::send_pkt(rte_mbuf* pkt) noexcept
 gen::priv::event_handle manager_impl::create_scheduler_event() noexcept
 {
     return scheduler_.create_event();
+}
+
+void manager_impl::do_report(const gen::priv::generation_report&) noexcept
+{
+    // TODO: Send the report to the management system
 }
 
 ////////////////////////////////////////////////////////////////////////////////
