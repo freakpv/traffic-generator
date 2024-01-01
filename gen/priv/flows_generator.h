@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gen/priv/event_handle.h"
+#include "put/time_utils.h"
 
 namespace gen::priv
 {
@@ -16,7 +17,7 @@ public:
     using mbuf_ptr_type = std::unique_ptr<rte_mbuf, mbuf_free>;
     struct pkt
     {
-        uint64_t rel_tsc; // relative timestamp in TSC cycles
+        put::cycles rel_tsc; // relative timestamp
         mbuf_ptr_type mbuf;
         bool from_cln; // true - client to server, false - server to client
     };

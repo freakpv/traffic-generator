@@ -96,7 +96,6 @@ http_server::get_response(target_type target, req_body_type body) noexcept
     return baio::async_initiate<handler_type,
                                 void(bhttp::status, resp_body_type&&)>(
         [target, body, this](auto&& callme) {
-            // TODO: std::function can't be constructed with move only type
             usr_handler_(target, body, std::move(callme));
         },
         baio::use_awaitable);

@@ -1,29 +1,60 @@
 #pragma once
 
-// TODO: Use rte_get_timer_hz and rte_get_timer_cycles
-// because this is what rte_timer functions use internally.
-
 namespace put
 {
-
-inline uint64_t duration_to_tsc(stdcr::seconds dur) noexcept
+// The functionality here:
+// - allows easy switching between rte_get_tsc_cycles/rte_get_tsc_hz and
+// rte_get_timer_cycles/rte_get_timer_hz. Currently the functionality uses the
+// latter pair of functions because the DPDK `rte_timer` functionality uses them
+// - strong typing is always better than a weak one
+// - provides conversion functions between the std::chrono duration types and
+// the `cycles` type.
+struct cycles
 {
-    return dur.count() * rte_get_tsc_hz();
-}
+    uint64_t num;
 
-inline uint64_t duration_to_tsc(stdcr::milliseconds dur) noexcept
-{
-    return (dur.count() * rte_get_tsc_hz()) / 1'000ul;
-}
+    static cycles current() noexcept { return {rte_get_timer_cycles()}; }
+    static uint64_t frequency_hz() noexcept { return rte_get_timer_hz(); }
 
-inline uint64_t duration_to_tsc(stdcr::microseconds dur) noexcept
-{
-    return (dur.count() * rte_get_tsc_hz()) / 1'000'000ul;
-}
+    static cycles from_duration(stdcr::seconds dur) noexcept
+    {
+        return {dur.count() * frequency_hz()};
+    }
+    static cycles from_duration(stdcr::milliseconds dur) noexcept
+    {
+        return {(dur.count() * frequency_hz()) / 1'000ul};
+    }
+    static cycles from_duration(stdcr::microseconds dur) noexcept
+    {
+        return {(dur.count() * frequency_hz()) / 1'000'000ul};
+    }
+    static cycles from_duration(stdcr::nanoseconds dur) noexcept
+    {
+        return {(dur.count() * frequency_hz()) / 1'000'000'000ul};
+    }
 
-inline uint64_t duration_to_tsc(stdcr::nanoseconds dur) noexcept
-{
-    return (dur.count() * rte_get_tsc_hz()) / 1'000'000'000ul;
-}
+    constexpr cycles& operator+=(const cycles& rhs) noexcept
+    {
+        num += rhs.num;
+        return *this;
+    }
+    constexpr cycles& operator-=(const cycles& rhs) noexcept
+    {
+        num -= rhs.num;
+        return *this;
+    }
+
+    constexpr cycles operator+(const cycles& rhs) const noexcept
+    {
+        return {num + rhs.num};
+    }
+    constexpr cycles operator-(const cycles& rhs) const noexcept
+    {
+        return {num - rhs.num};
+    }
+
+    constexpr bool operator==(const cycles&) const noexcept  = default;
+    constexpr auto operator<=>(const cycles&) const noexcept = default;
+};
 
 } // namespace put

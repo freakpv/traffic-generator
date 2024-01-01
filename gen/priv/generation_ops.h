@@ -1,12 +1,14 @@
 #pragma once
 
+#include "put/time_utils.h"
+
 namespace gen::priv
 {
 class event_handle;
 
 struct generation_report
 {
-    uint64_t tstamp_tsc;
+    put::cycles tstamp;
     uint32_t flow_idx;
     uint32_t pkt_idx;
     uint32_t pkt_len;

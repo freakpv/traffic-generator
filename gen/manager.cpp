@@ -35,12 +35,12 @@ class manager_impl final : public gen::priv::generation_ops
     using flows_generator_type = gen::priv::flows_generator;
     std::vector<flows_generator_type> generators_;
 
-    struct gen_ticks
+    struct gen_cycles
     {
-        uint64_t begin;
-        uint64_t duration;
+        put::cycles begin;
+        put::cycles duration;
     };
-    std::optional<const gen_ticks> gen_ticks_;
+    std::optional<const gen_cycles> gen_cycles_;
 
     std::vector<rte_mbuf*> tx_pkts_;
 
@@ -60,7 +60,7 @@ private:
     void on_inc_msg(mgmt::req_stop_generation&&) noexcept;
 
     void stop_generation() noexcept;
-    bool generation_started() const noexcept { return !!gen_ticks_; }
+    bool generation_started() const noexcept { return !!gen_cycles_; }
 
 private:
     void transmit_tx_pkts() noexcept;
@@ -112,7 +112,7 @@ void manager_impl::process_events() noexcept
     // The generation timeout is tracked explicitly and not through a registered
     // timer because we can't do some actions with the timer system from inside
     // a timer callback.
-    if ((rte_get_tsc_cycles() - gen_ticks_->begin) >= gen_ticks_->duration) {
+    if ((put::cycles::current() - gen_cycles_->begin) > gen_cycles_->duration) {
         stop_generation();
         if (!tx_pkts_.empty()) transmit_tx_pkts();
         return;
@@ -178,10 +178,10 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
                      -err, ::strerrordesc_np(-err));
     }
 
-    TG_ENFORCE(!gen_ticks_);
-    gen_ticks_.emplace(gen_ticks{
-        .begin    = rte_get_tsc_cycles(),
-        .duration = put::duration_to_tsc(msg.cfg->duration()),
+    TG_ENFORCE(!gen_cycles_);
+    gen_cycles_.emplace(gen_cycles{
+        .begin    = put::cycles::current(),
+        .duration = put::cycles::from_duration(msg.cfg->duration()),
     });
 
     TG_LOG_INFO("Generation started with {} flows generators\n",
@@ -224,7 +224,7 @@ void manager_impl::stop_generation() noexcept
     // because every generator should unregister its timers upon destruction.
     TG_ENFORCE(scheduler_.count_events() == 0);
 
-    gen_ticks_.reset();
+    gen_cycles_.reset();
 
     TG_LOG_INFO("Generation stopped\n");
 }

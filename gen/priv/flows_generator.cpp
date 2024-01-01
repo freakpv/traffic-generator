@@ -5,7 +5,6 @@
 #include "put/pkt_utils.h"
 #include "put/tg_assert.h"
 #include "put/throw.h"
-#include "put/time_utils.h"
 
 namespace gen::priv
 {
@@ -51,9 +50,10 @@ load_pkts(const flows_generator::config& cfg)
             *ipg_tstamp = *ipg_tstamp + *ipg;
         }
         if (!prev_tstamp) prev_tstamp = pk.tstamp;
+        using put::cycles;
         ret.push_back(flows_generator::pkt{
-            .rel_tsc  = put::duration_to_tsc(if_gap + pk.tstamp - *prev_tstamp),
-            .mbuf     = flows_generator::mbuf_ptr_type(pk.mbuf),
+            .rel_tsc = cycles::from_duration(if_gap + pk.tstamp - *prev_tstamp),
+            .mbuf    = flows_generator::mbuf_ptr_type(pk.mbuf),
             .from_cln = false, // Will be set later to a correct value
         });
     }
@@ -198,9 +198,9 @@ void flows_generator::setup_flow_events()
 {
     // The flows need to be evenly spread through out the second
     using namespace std::chrono_literals;
-    const auto flow_tsc_step =
-        put::duration_to_tsc(stdcr::microseconds{1'000'000us / flows_.size()});
-    if (flow_tsc_step == 0) {
+    const auto flow_tsc_step = put::cycles::from_duration(
+        stdcr::microseconds{1'000'000us / flows_.size()});
+    if (flow_tsc_step == put::cycles{0}) {
         put::throw_runtime_error(
             "Can't work with so many ({}) flows per second", flows_.size());
     }
@@ -208,7 +208,7 @@ void flows_generator::setup_flow_events()
     // TODO: Optimization
     // For the case of working with predefined inter packet gaps we can
     // schedule periodic event only once.
-    for (uint64_t flow_tsc = 0; auto& flow : flows_) {
+    for (put::cycles flow_tsc{0}; auto& flow : flows_) {
         const auto evtm = flow_tsc + pkts_[flow.pkt_idx].rel_tsc;
         flow.event      = gen_ops_->create_scheduler_event();
         flow.event.schedule_single(evtm, on_event, &flow);
@@ -238,14 +238,14 @@ void flows_generator::on_flow_event(flow& fl) noexcept
                                ben::native_to_big(fl.cln_ip_addr.to_uint()));
     }();
     generation_report report = {
-        .tstamp_tsc = rte_get_tsc_cycles(),
-        .flow_idx   = fl.idx,
-        .pkt_idx    = fl.pkt_idx,
-        .pkt_len    = pkt.mbuf->pkt_len,
-        .src_addr   = in_addr{src_addr},
-        .dst_addr   = in_addr{dst_addr},
-        .from_cln   = pkt.from_cln,
-        .ok         = true,
+        .tstamp   = put::cycles::current(),
+        .flow_idx = fl.idx,
+        .pkt_idx  = fl.pkt_idx,
+        .pkt_len  = pkt.mbuf->pkt_len,
+        .src_addr = in_addr{src_addr},
+        .dst_addr = in_addr{dst_addr},
+        .from_cln = pkt.from_cln,
+        .ok       = true,
     };
     // TODO: Optimization
     // The copy of the whole packet here is really unfortunate.
