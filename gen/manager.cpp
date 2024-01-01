@@ -67,7 +67,7 @@ private:
 
 private: // The `generation_ops` interface
     rte_mbuf* alloc_mbuf() noexcept override;
-    rte_mbuf* copy_pkt(rte_mbuf*) noexcept override;
+    rte_mbuf* copy_pkt(const rte_mbuf*) noexcept override;
     void send_pkt(rte_mbuf*) noexcept override;
     gen::priv::event_handle create_scheduler_event() noexcept override;
 };
@@ -253,7 +253,7 @@ rte_mbuf* manager_impl::alloc_mbuf() noexcept
     return rte_pktmbuf_alloc(mbuf_pool_.pool());
 }
 
-rte_mbuf* manager_impl::copy_pkt(rte_mbuf* pkt) noexcept
+rte_mbuf* manager_impl::copy_pkt(const rte_mbuf* pkt) noexcept
 {
     return rte_pktmbuf_copy(pkt, mbuf_pool_.pool(), 0, pkt->pkt_len);
 }

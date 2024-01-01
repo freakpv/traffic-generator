@@ -30,7 +30,7 @@ public:
         uint32_t pkt_idx;
         baio_ip_addr4 cln_ip_addr;
         baio_ip_addr4 srv_ip_addr;
-        uint64_t rel_tsc_first_pkt;
+        uint64_t rel_tsc_first_pkt; // TODO: This member is needed only once
         event_handle event;
         flows_generator* fgen;
     };
@@ -91,6 +91,7 @@ public:
 private:
     void setup_flow_events() noexcept;
     void on_flow_event(flow&) noexcept;
+    static void on_event(rte_timer*, void*) noexcept;
 };
 
 } // namespace gen::priv

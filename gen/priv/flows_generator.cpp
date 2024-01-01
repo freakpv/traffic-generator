@@ -9,16 +9,6 @@
 
 namespace gen::priv
 {
-/* TODO
-    if (offl.ip_csum)
-        pkt->ol_flags |= (RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_IPV4);
-    if (offl.tcp_csum) pkt->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
-    if (offl.udp_csum) pkt->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
-    if (offl.ip_csum || offl.tcp_csum || offl.udp_csum) {
-        pkt->l2_len = RTE_ETHER_HDR_LEN;
-        pkt->l3_len = pkt_info.iph_len_;
-    }
-*/
 
 template <typename T>
 static bool inc_reset(T& val, T beg, T end) noexcept
@@ -34,6 +24,10 @@ static std::vector<flows_generator::pkt>
 load_pkts(const flows_generator::config& cfg)
 {
     std::vector<flows_generator::pkt> ret;
+    // The gap between flows with the same index i.e. when the same flow is
+    // restarted because its duration is shorter than the duration of the whole
+    // test. This may come from the generation config, if/when needed.
+    constexpr stdcr::milliseconds if_gap(100);
     /*
      * Load the packets and set the time-stamps as needed
      * Note that every time-stamp is relative to the time-stamp of the previous
@@ -58,7 +52,7 @@ load_pkts(const flows_generator::config& cfg)
         }
         if (!prev_tstamp) prev_tstamp = pk.tstamp;
         ret.push_back(flows_generator::pkt{
-            .rel_tsc  = put::duration_to_tsc(pk.tstamp - *prev_tstamp),
+            .rel_tsc  = put::duration_to_tsc(if_gap + pk.tstamp - *prev_tstamp),
             .mbuf     = flows_generator::mbuf_ptr_type(pk.mbuf),
             .from_cln = false, // Will be set later to a correct value
         });
@@ -215,19 +209,73 @@ void flows_generator::setup_flow_events() noexcept
     // TODO: Optimization
     // For the case of working with predefined inter packet gaps we can
     // schedule periodic event only once.
-    auto cb = +[](rte_timer*, void* ctx) {
-        auto fl = static_cast<flow*>(ctx);
-        fl->fgen->on_flow_event(*fl);
-    };
     for (auto& flow : flows_) {
-        flow.event = gen_ops_->create_scheduler_event();
-        flow.event.schedule_single(
-            flow.rel_tsc_first_pkt + pkts_[flow.pkt_idx].rel_tsc, cb, &flow);
+        const auto evtm = flow.rel_tsc_first_pkt + pkts_[flow.pkt_idx].rel_tsc;
+        flow.event      = gen_ops_->create_scheduler_event();
+        flow.event.schedule_single(evtm, on_event, &flow);
     }
 }
 
-void flows_generator::on_flow_event(flow&) noexcept
+void flows_generator::on_flow_event(flow& fl) noexcept
 {
+    if (++fl.pkt_idx == pkts_.size()) {
+        // Upon restarting the stream we need to change it's client and server
+        // addresses according to the burst counter logic.
+        fl.pkt_idx     = 0;
+        fl.cln_ip_addr = *cln_ip_addr_;
+        fl.srv_ip_addr = *srv_ip_addr_;
+        if (inc_reset(burst_idx_, 0u, burst_cnt_)) {
+            inc_reset(cln_ip_addr_, cln_ip_addrs_.begin(), cln_ip_addrs_.end());
+            inc_reset(srv_ip_addr_, srv_ip_addrs_.begin(), srv_ip_addrs_.end());
+        }
+    }
+    const auto& pkt = pkts_[fl.pkt_idx];
+    // The copy of the whole packet here is really unfortunate.
+    // It's needed because we are going to change the client and server
+    // addresses in the IP header. Other flows may do the same while the packet
+    // is waiting in the queues to be transmitted and before the NIC actually
+    // do the transmission. Thus every single flow need to work on its own copy
+    // of the packet.
+    // A possible optimization here is to segment the packets upon loading so
+    // that the packet headers are in the first and smaller segment while the
+    // payload is in a separate packet and thus only the first segment will need
+    // to be copied here.
+    rte_mbuf* mbuf = gen_ops_->copy_pkt(pkt.mbuf.get());
+    if (!mbuf) {
+        // TODO: stats
+        // TODO: reflect this in the CSV report somehow
+        return;
+    }
+    // All packets have been checked upon loading and thus we may jump right
+    // to the IP header.
+    constexpr size_t offs = RTE_ETHER_HDR_LEN;
+    auto* ih              = put::read_hdr<rte_ipv4_hdr>(mbuf, offs);
+    if (pkt.from_cln) {
+        ih->src_addr = ben::native_to_big(fl.cln_ip_addr.to_uint());
+        ih->dst_addr = ben::native_to_big(fl.srv_ip_addr.to_uint());
+    } else {
+        ih->src_addr = ben::native_to_big(fl.srv_ip_addr.to_uint());
+        ih->dst_addr = ben::native_to_big(fl.cln_ip_addr.to_uint());
+    }
+    // The hardware needs to (re)calculate the checksums of the packet.
+    // For this we need to set the appropriate flags,
+    constexpr auto flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM |
+                           RTE_MBUF_F_TX_TCP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
+    mbuf->ol_flags |= flags;
+    mbuf->l2_len = RTE_ETHER_HDR_LEN;
+    mbuf->l3_len = put::hdr_len(ih);
+
+    gen_ops_->send_pkt(mbuf);
+
+    // TODO: Report the sent packet with all the information for the CSV report
+
+    fl.event.schedule_single(pkt.rel_tsc, on_event, &fl);
+}
+
+void flows_generator::on_event(rte_timer*, void* ctx) noexcept
+{
+    auto fl = static_cast<flow*>(ctx);
+    fl->fgen->on_flow_event(*fl);
 }
 
 } // namespace gen::priv
