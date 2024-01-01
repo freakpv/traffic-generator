@@ -1,9 +1,8 @@
-#include "aliases.h"
 #include "version_info.h"
 
 #include "app/application.h"
 
-#include "log/log.h"
+#include "log/tg_log.h"
 #include "put/stacktrace.h"
 #include "put/throw.h"
 
@@ -48,8 +47,7 @@ int main(int argc, char** argv)
             put::throw_runtime_error("No options provided.\n{}", opts);
         }
     } catch (const std::exception& ex) {
-        fmt::print(stderr, "ERROR: Failed to run the traffic generator! {}\n",
-                   ex.what());
+        TG_LOG_ERROR("Failed to run the traffic generator! {}\n", ex.what());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

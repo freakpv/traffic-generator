@@ -3,7 +3,7 @@
 
 #include "gen/manager.h"
 
-#include "log/log.h"
+#include "log/tg_log.h"
 
 #include "mgmt/manager.h"
 #include "mgmt/messages.h"
@@ -94,11 +94,11 @@ void application_impl::signal_handler(int sig) noexcept
 {
     switch (sig) {
     case SIGINT: {
-        TGLOG_INFO("Stop requested via SIGINT\n");
+        TG_LOG_INFO("Stop requested via SIGINT\n");
         stop_flag_.test_and_set(std::memory_order_seq_cst);
     } break;
     case SIGTERM:
-        TGLOG_INFO("Stop requested via SIGTERM\n");
+        TG_LOG_INFO("Stop requested via SIGTERM\n");
         stop_flag_.test_and_set(std::memory_order_seq_cst);
         break;
     default: TG_UNREACHABLE(); break;
@@ -146,7 +146,7 @@ application_impl::dpdk_eal::~dpdk_eal() noexcept
 application::application(const stdfs::path& cfg_path)
 {
     app::priv::config cfg(cfg_path);
-    TGLOG_INFO("Starting with with settings: {}\n", cfg);
+    TG_LOG_INFO("Starting with with settings: {}\n", cfg);
     impl_ = std::make_unique<application_impl>(cfg);
 }
 
@@ -162,7 +162,7 @@ void application::run() noexcept
         impl_.get(), CALL_MAIN);
     rte_eal_mp_wait_lcore();
 
-    TGLOG_INFO("Application stopped\n");
+    TG_LOG_INFO("Application stopped\n");
 }
 
 } // namespace app

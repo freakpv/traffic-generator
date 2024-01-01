@@ -5,7 +5,7 @@
 #include "gen/priv/mbuf_pool.h"
 #include "gen/priv/event_scheduler.h"
 
-#include "log/log.h"
+#include "log/tg_log.h"
 #include "mgmt/gen_config.h"
 #include "mgmt/messages.h"
 #include "mgmt/stats.h"
@@ -87,8 +87,8 @@ manager_impl::manager_impl(const config_type& cfg)
 , working_dir_(cfg.working_dir)
 {
     tx_pkts_.reserve(cnt_burst_pkts);
-    TGLOG_INFO("Constructed the generation manager with working dir: {}\n",
-               working_dir_);
+    TG_LOG_INFO("Constructed the generation manager with working dir: {}\n",
+                working_dir_);
 }
 
 void manager_impl::process_events() noexcept
@@ -129,10 +129,11 @@ void manager_impl::process_events() noexcept
 
 void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
 {
-    TGLOG_INFO("Got request to start generation for {} with {} capture files\n",
-               msg.cfg->duration(), msg.cfg->flows_configs().size());
+    TG_LOG_INFO(
+        "Got request to start generation for {} with {} capture files\n",
+        msg.cfg->duration(), msg.cfg->flows_configs().size());
     if (generation_started()) {
-        TGLOG_INFO("Generation already started\n");
+        TG_LOG_INFO("Generation already started\n");
         out_queue_->enqueue(
             mgmt::res_start_generation{.res = "Already started"});
         return;
@@ -158,7 +159,7 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
             });
         }
     } catch (const std::exception& ex) {
-        TGLOG_INFO("Failed to create flows generator: {}\n", ex.what());
+        TG_LOG_INFO("Failed to create flows generator: {}\n", ex.what());
         out_queue_->enqueue(mgmt::res_start_generation{.res = ex.what()});
         return;
     }
@@ -173,8 +174,8 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         cnt_tx_pkts_qfull_  = 0;
         cnt_tx_pkts_nombuf_ = 0;
     } else {
-        TGLOG_ERROR("Failed to reset the ethernet device stats: ({}) {}\n",
-                    -err, ::strerrordesc_np(-err));
+        TG_LOG_ERROR("Failed to reset the ethernet device stats: ({}) {}\n",
+                     -err, ::strerrordesc_np(-err));
     }
 
     TG_ENFORCE(!gen_ticks_);
@@ -183,8 +184,8 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         .duration = put::duration_to_tsc(msg.cfg->duration()),
     });
 
-    TGLOG_INFO("Generation started with {} flows generators\n",
-               generators_.size());
+    TG_LOG_INFO("Generation started with {} flows generators\n",
+                generators_.size());
 
     out_queue_->enqueue(mgmt::res_start_generation{});
 }
@@ -193,7 +194,7 @@ void manager_impl::on_inc_msg(mgmt::req_stop_generation&&) noexcept
 {
     // The generation stop request is always fully processed so that the
     // summary stats can be reported via the response.
-    TGLOG_INFO("Got request to stop generation\n");
+    TG_LOG_INFO("Got request to stop generation\n");
 
     stop_generation();
 
@@ -225,7 +226,7 @@ void manager_impl::stop_generation() noexcept
 
     gen_ticks_.reset();
 
-    TGLOG_INFO("Generation stopped\n");
+    TG_LOG_INFO("Generation stopped\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -237,7 +238,7 @@ void manager_impl::transmit_tx_pkts() noexcept
         const auto cnt_drop = cnt_all - cnt;
         rte_pktmbuf_free_bulk(&tx_pkts_[cnt], cnt_drop);
         cnt_tx_pkts_qfull_ += cnt_drop;
-        TGLOG_ERROR("Dropped {} of {} on transmit\n", cnt_drop, cnt_all);
+        TG_LOG_ERROR("Dropped {} of {} on transmit\n", cnt_drop, cnt_all);
     }
     tx_pkts_.clear();
 }
