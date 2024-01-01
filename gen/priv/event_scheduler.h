@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gen/priv/event_handle.h"
+
 #include "put/time_utils.h"
 
 namespace gen::priv
@@ -30,6 +32,15 @@ public:
             rte_timer_manage();
         }
     }
+
+    // TODO:
+    event_handle create_event() noexcept { return {}; }
+
+    // It's unfortunate that the event scheduling system details leak here
+    // with the first argument of the event callback.
+    // I could have hidden it behind another callback layer but this would have
+    // created another call indirection on every callback and ... here we are.
+    // static void event_callback(rte_timer*, void*) noexcept;
 
     // TODO:
     size_t count_events() const noexcept { return 0; }

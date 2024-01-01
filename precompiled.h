@@ -74,6 +74,7 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <boost/range/irange.hpp>
 #include <boost/spirit/home/x3.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>

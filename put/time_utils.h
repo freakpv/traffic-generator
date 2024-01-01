@@ -1,5 +1,8 @@
 #pragma once
 
+// TODO: Use rte_get_timer_hz and rte_get_timer_cycles
+// because this is what rte_timer functions use internally.
+
 namespace put
 {
 

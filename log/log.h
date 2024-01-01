@@ -1,5 +1,7 @@
 #pragma once
 
+// TODO: Rename this to TG_LOG_... tg_log.h
+
 // Very simple and very inefficient logging functionality
 
 // #define TGLOG_DEBUG_ENABLED

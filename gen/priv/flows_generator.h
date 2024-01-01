@@ -32,7 +32,7 @@ public:
         baio_ip_addr4 srv_ip_addr;
         uint64_t rel_tsc_first_pkt;
         event_handle event;
-        flows_generator* parent;
+        flows_generator* fgen;
     };
 
 private:
@@ -56,8 +56,8 @@ private:
 
     // These members are used to handle the burst functionality and they
     // are changed during runtime, except the burst count.
-    baio_ip_addr4 cln_ip_addr_;
-    baio_ip_addr4 srv_ip_addr_;
+    baio_ip_addr4_rng::iterator cln_ip_addr_;
+    baio_ip_addr4_rng::iterator srv_ip_addr_;
     uint32_t burst_idx_;
     uint32_t burst_cnt_;
 
@@ -87,6 +87,10 @@ public:
     flows_generator()                                  = delete;
     flows_generator(const flows_generator&)            = delete;
     flows_generator& operator=(const flows_generator&) = delete;
+
+private:
+    void setup_flow_events() noexcept;
+    void on_flow_event(flow&) noexcept;
 };
 
 } // namespace gen::priv

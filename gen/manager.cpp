@@ -69,6 +69,7 @@ private: // The `generation_ops` interface
     rte_mbuf* alloc_mbuf() noexcept override;
     rte_mbuf* copy_pkt(rte_mbuf*) noexcept override;
     void send_pkt(rte_mbuf*) noexcept override;
+    gen::priv::event_handle create_scheduler_event() noexcept override;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,6 +160,9 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         out_queue_->enqueue(mgmt::res_start_generation{.res = ex.what()});
         return;
     }
+
+    // TODO: Debug log the generated flows.
+
     TG_ENFORCE(generators_.empty());
     generators_ = std::move(gens);
 
@@ -258,6 +262,11 @@ void manager_impl::send_pkt(rte_mbuf* pkt) noexcept
 {
     tx_pkts_.push_back(pkt);
     if (tx_pkts_.size() == cnt_burst_pkts) transmit_tx_pkts();
+}
+
+gen::priv::event_handle manager_impl::create_scheduler_event() noexcept
+{
+    return scheduler_.create_event();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
