@@ -239,6 +239,7 @@ void flows_generator::on_flow_event(flow& fl) noexcept
     }();
     generation_report report = {
         .tstamp   = put::cycles::current(),
+        .gen_idx  = idx_,
         .flow_idx = fl.idx,
         .pkt_idx  = fl.pkt_idx,
         .pkt_len  = pkt.mbuf->pkt_len,

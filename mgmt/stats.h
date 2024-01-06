@@ -1,9 +1,14 @@
 #pragma once
 
+#include "put/time_utils.h"
+
 namespace mgmt
 {
 
-struct summary_stats
+// TODO: Further development
+// These stats could be extended with stats per generator so that we can draw
+// not only real-time summary graphs but also real-time graphs per generator
+struct stats
 {
 #define TG_COUNTERS(MACRO)              \
     MACRO(uint64_t, cnt_rx_pkts)        \
@@ -30,6 +35,36 @@ struct summary_stats
     }
 
 #undef TG_COUNTERS
+};
+
+struct summary_stats
+{
+    stats summary;
+
+    struct entry
+    {
+        uint32_t gen_idx;
+        uint32_t flow_idx;
+        uint64_t cnt_pkts;
+        uint64_t cnt_bytes;
+        put::cycles duration;
+    };
+    std::vector<entry> detailed;
+};
+
+// Report used for producing a CSV report with per generator/flow/packet
+// granularity. It can be used for drawing additional graphs.
+struct generation_report
+{
+    put::cycles tstamp;
+    uint32_t gen_idx;
+    uint32_t flow_idx;
+    uint32_t pkt_idx;
+    uint32_t pkt_len;
+    in_addr src_addr;
+    in_addr dst_addr;
+    uint32_t from_cln : 1; // true - from client, false - from server
+    uint32_t ok       : 1; // true - generated, false - generation missed
 };
 
 } // namespace mgmt

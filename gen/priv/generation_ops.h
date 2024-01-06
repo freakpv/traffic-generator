@@ -9,6 +9,7 @@ class event_handle;
 struct generation_report
 {
     put::cycles tstamp;
+    uint32_t gen_idx;
     uint32_t flow_idx;
     uint32_t pkt_idx;
     uint32_t pkt_len;

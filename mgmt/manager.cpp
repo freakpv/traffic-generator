@@ -164,6 +164,8 @@ void manager_impl::on_req_get_stats(req_body_type,
                                     resp_callback_type&&) noexcept
 {
     // TODO
+    // This should request the stats from the generator
+    // and then should return the received `stats` converted to JSON.
 }
 
 void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
@@ -186,14 +188,16 @@ void manager_impl::on_inc_msg(mgmt::res_stop_generation&& msg) noexcept
     TG_ENFORCE(stop_cb_);
     if (!msg.res) {
         TG_LOG_INFO("Successfully stopped generation\n");
-        // TODO: Print the remaining of the detailed stats, if any.
+        // TODO: JSON the `summary_stats`.
         std::string body;
+        /* TODO: This should be the regular stats report
         body.reserve(1024);
         body += R"({"result": {")";
         msg.res.value().visit([&](std::string_view nam, auto val) {
             fmt::format_to(std::back_inserter(body), "\"{}\":{},", nam, val);
         });
         body += R"("}})";
+        */
         stop_cb_(bhttp::status::ok, std::move(body));
     } else {
         TG_LOG_INFO("Failed to stop generation: {}\n", msg.res.error());
@@ -207,6 +211,9 @@ void manager_impl::on_inc_msg(mgmt::res_stop_generation&& msg) noexcept
 void manager_impl::on_inc_msg(mgmt::stats_report&&) noexcept
 {
     // TODO
+    // This should get and store the `generation_report`s
+    // They should be written in the memory and dumped at the end to a CSV file.
+    // Or should be written in a memory mapped CSV file.
 }
 
 template <typename... Args>

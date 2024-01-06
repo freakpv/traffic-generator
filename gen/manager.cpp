@@ -245,6 +245,9 @@ void manager_impl::transmit_tx_pkts() noexcept
 
 void manager_impl::receive_rx_pkts() noexcept
 {
+    // TODO: Further development
+    // We need to detect which sent packets are not received back and
+    // reflect this in the generated reports.
     rte_mbuf* pkts[cnt_burst_pkts];
     if (const auto cnt = eth_dev_.receive_pkts(pkts); cnt > 0) {
         rte_pktmbuf_free_bulk(pkts, cnt);
