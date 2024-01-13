@@ -59,7 +59,7 @@ private:
     gen::priv::generation_ops* gen_ops_;
     baio_ip_addr4_rng cln_ip_addrs_;
     baio_ip_addr4_rng srv_ip_addrs_;
-    size_t idx_;
+    uint32_t idx_;
 
     // These members are used to handle the burst functionality and they
     // are changed during runtime, except the burst count.
@@ -71,7 +71,7 @@ private:
 public:
     struct config
     {
-        size_t idx;
+        uint32_t idx;
         stdfs::path cap_fpath;
         rte_ether_addr cln_ether_addr;
         rte_ether_addr srv_ether_addr;
@@ -96,7 +96,7 @@ public:
     flows_generator& operator=(const flows_generator&) = delete;
 
     std::span<const flow> flows() const noexcept { return flows_; }
-    size_t idx() const noexcept { return idx_; }
+    uint32_t idx() const noexcept { return idx_; }
 
 private:
     void setup_flow_events();

@@ -60,7 +60,7 @@ private:
     void on_inc_msg(mgmt::req_stop_generation&&) noexcept;
     void on_inc_msg(mgmt::req_stats_report&&) noexcept;
 
-    static mgmt::stats get_eth_stats() noexcept;
+    mgmt::stats get_eth_stats() noexcept;
 
     void stop_generation() noexcept;
     bool generation_started() const noexcept { return !!gen_cycles_; }
@@ -146,7 +146,7 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
     gens.reserve(msg.cfg->flows_configs().size());
     try {
         const auto cln_ether_addr = eth_dev_.get_mac_addr();
-        for (size_t idx = 0; const auto& cap_cfg : msg.cfg->flows_configs()) {
+        for (auto idx = 0u; const auto& cap_cfg : msg.cfg->flows_configs()) {
             gens.emplace_back(flows_generator_type::config{
                 .idx            = idx++,
                 .cap_fpath      = working_dir_ / cap_cfg.name,
@@ -215,7 +215,7 @@ void manager_impl::on_inc_msg(mgmt::req_stop_generation&&) noexcept
     stop_generation();
 
     out_queue_->enqueue(mgmt::res_stop_generation{
-        .summary = get_eth_stats(), .detailed = std::move(detailed)});
+        .res = {.summary = get_eth_stats(), .detailed = std::move(detailed)}});
 }
 
 void manager_impl::on_inc_msg(mgmt::req_stats_report&&) noexcept

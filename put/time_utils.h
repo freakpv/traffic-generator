@@ -33,6 +33,21 @@ struct cycles
         return {(dur.count() * frequency_hz()) / 1'000'000'000ul};
     }
 
+    template <typename Dur>
+    Dur to() const noexcept
+    {
+        if constexpr (std::is_same_v<Dur, stdcr::seconds>)
+            return Dur(num / frequency_hz());
+        else if constexpr (std::is_same_v<Dur, stdcr::milliseconds>)
+            return Dur((num * 1'000ul) / frequency_hz());
+        else if constexpr (std::is_same_v<Dur, stdcr::microseconds>)
+            return Dur((num * 1'000'000ul) / frequency_hz());
+        else if constexpr (std::is_same_v<Dur, stdcr::nanoseconds>)
+            return Dur((num * 1'000'000'000ul) / frequency_hz());
+        else
+            static_assert(false, "Unsupported duration type");
+    }
+
     constexpr cycles& operator+=(const cycles& rhs) noexcept
     {
         num += rhs.num;

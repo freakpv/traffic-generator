@@ -24,7 +24,7 @@ struct req_stop_generation
 
 struct res_stop_generation
 {
-    bout::result<mgmt::summary_stats, std::string> res = mgmt::summary_stats{};
+    mgmt::summary_stats res = {};
 };
 
 struct req_stats_report
@@ -87,7 +87,7 @@ struct inc_messages_queue
                  res_start_generation,
                  res_stop_generation,
                  res_stats_report,
-                 generatio_report>
+                 generation_report>
 {
 };
 

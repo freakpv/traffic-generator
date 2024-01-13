@@ -30,6 +30,7 @@ private:
     req_handlers_type req_handlers_;
     resp_callback_type start_cb_;
     resp_callback_type stop_cb_;
+    resp_callback_type stats_cb_;
 
 public:
     explicit manager_impl(const config_type&);
@@ -50,7 +51,8 @@ private:
 
     void on_inc_msg(mgmt::res_start_generation&&) noexcept;
     void on_inc_msg(mgmt::res_stop_generation&&) noexcept;
-    void on_inc_msg(mgmt::stats_report&&) noexcept;
+    void on_inc_msg(mgmt::res_stats_report&&) noexcept;
+    void on_inc_msg(mgmt::generation_report&&) noexcept;
 
     template <typename... Args>
     static resp_body_type make_response_body(fmt::format_string<Args...>,
@@ -161,11 +163,23 @@ void manager_impl::on_req_stop_gen(req_body_type,
 }
 
 void manager_impl::on_req_get_stats(req_body_type,
-                                    resp_callback_type&&) noexcept
+                                    resp_callback_type&& cb) noexcept
 {
-    // TODO
-    // This should request the stats from the generator
-    // and then should return the received `stats` converted to JSON.
+    TG_LOG_DEBUG("Got stats request\n");
+    if (stats_cb_) {
+        TG_LOG_DEBUG("Stats request already in progress\n");
+        cb(bhttp::status::precondition_failed,
+           make_response_body("Stats request already in progress"));
+        return;
+    }
+    if (out_queue_->enqueue(req_stats_report{})) {
+        TG_LOG_DEBUG("Enqueued stats request\n");
+        stats_cb_ = std::move(cb);
+    } else {
+        TG_LOG_DEBUG("Failed to enqueue stsyd request\n");
+        cb(bhttp::status::internal_server_error,
+           make_response_body("Failed to enqueue request"));
+    }
 }
 
 void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
@@ -185,35 +199,69 @@ void manager_impl::on_inc_msg(mgmt::res_start_generation&& msg) noexcept
 
 void manager_impl::on_inc_msg(mgmt::res_stop_generation&& msg) noexcept
 {
-    TG_ENFORCE(stop_cb_);
-    if (!msg.res) {
-        TG_LOG_INFO("Successfully stopped generation\n");
-        // TODO: JSON the `summary_stats`.
-        std::string body;
-        /* TODO: This should be the regular stats report
-        body.reserve(1024);
-        body += R"({"result": {")";
-        msg.res.value().visit([&](std::string_view nam, auto val) {
-            fmt::format_to(std::back_inserter(body), "\"{}\":{},", nam, val);
-        });
-        body += R"("}})";
-        */
-        stop_cb_(bhttp::status::ok, std::move(body));
-    } else {
-        TG_LOG_INFO("Failed to stop generation: {}\n", msg.res.error());
-        stop_cb_(bhttp::status::precondition_failed,
-                 make_response_body("Failed to stop generation: {}\n",
-                                    msg.res.error()));
+    TG_LOG_INFO("Successfully stopped generation\n");
+    // This manual JSON generation is ugly and verbose but:
+    // - there are only few messages where this is needed
+    // - it's faster than putting the content into boost::json::value and
+    // then serializing it to a string.
+    std::string body;
+    body.reserve(4096);
+    body += R"({"result": {)";
+    msg.res.summary.visit([&](std::string_view nam, auto val) {
+        fmt::format_to(std::back_inserter(body), "\"{}\":{},", nam, val);
+    });
+    body.pop_back(); // Remove the last comma
+    body += R"(}, "detailed": [)";
+    for (const auto& ent : msg.res.detailed) {
+        body += '{';
+        fmt::format_to(std::back_inserter(body), "\"gen_idx\":{},",
+                       ent.gen_idx);
+        fmt::format_to(std::back_inserter(body), "\"flow_idx\":{},",
+                       ent.flow_idx);
+        fmt::format_to(std::back_inserter(body), "\"cnt_pkts\":{},",
+                       ent.cnt_pkts);
+        fmt::format_to(std::back_inserter(body), "\"cnt_bytes\":{},",
+                       ent.cnt_bytes);
+        fmt::format_to(std::back_inserter(body), "\"duration_usec\":{}",
+                       ent.duration.to<stdcr::microseconds>().count());
+        body += "},";
     }
+    if (body.back() == ',') body.pop_back();
+    body += R"(]})";
+
+    TG_ENFORCE(stop_cb_);
+    stop_cb_(bhttp::status::ok, std::move(body));
     stop_cb_ = {};
 }
 
-void manager_impl::on_inc_msg(mgmt::stats_report&&) noexcept
+void manager_impl::on_inc_msg(mgmt::res_stats_report&& msg) noexcept
 {
-    // TODO
-    // This should get and store the `generation_report`s
-    // They should be written in the memory and dumped at the end to a CSV file.
-    // Or should be written in a memory mapped CSV file.
+    TG_LOG_INFO("Successfully stopped generation\n");
+
+    std::string body;
+    body.reserve(1024);
+    body += R"({"result": {)";
+    msg.res.visit([&](std::string_view nam, auto val) {
+        fmt::format_to(std::back_inserter(body), "\"{}\":{},", nam, val);
+    });
+    body.pop_back(); // Remove the last comma
+    body += R"(}})";
+
+    TG_ENFORCE(stats_cb_);
+    stats_cb_(bhttp::status::ok, std::move(body));
+    stats_cb_ = {};
+}
+
+void manager_impl::on_inc_msg(mgmt::generation_report&&) noexcept
+{
+    // TODO Write the generation report in CSV format:
+    // - it can be written in the memory and dumped to a file when the
+    // generation is stopped
+    // - it can be written to a memory mapped file
+    // - it can be written to a pipe and whoever is interested may listen on
+    // the other side
+    // - it can be written to a regular file with memory buffering and will have
+    // some spikes here and there when the data is flushed to the disk.
 }
 
 template <typename... Args>
