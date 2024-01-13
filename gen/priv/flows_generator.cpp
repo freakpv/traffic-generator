@@ -153,6 +153,10 @@ static auto setup_flows(baio_ip_addr4_rng cln_ip_addrs,
             .srv_ip_addr = *srv_ip_addr,
             .event       = {}, // We'll be set later
             .fgen        = fgen,
+            .cnt_pkts    = {},
+            .cnt_bytes   = {},
+            .tstamp_beg  = {},
+            .tstamp_end  = {},
         });
         // All streams from a given burst are with the same client and server
         // addresses. The addresses change for the next burst.
@@ -237,8 +241,17 @@ void flows_generator::on_flow_event(flow& fl) noexcept
                    : std::pair(ben::native_to_big(fl.srv_ip_addr.to_uint()),
                                ben::native_to_big(fl.cln_ip_addr.to_uint()));
     }();
+    const auto tstamp = put::cycles::current();
+    fl.cnt_pkts += 1;
+    fl.cnt_bytes += pkt.mbuf->pkt_len;
+    fl.tstamp_end = tstamp;
+    // Note that the first packet marks the beginning of the flow.
+    // If a flow contains only single packet and burst is equal to 1 then the
+    // duration of this flow will be report as 0 which is a bit weird but
+    // it shouldn't happen in practice ... or we can change the logic here.
+    if (fl.cnt_pkts == 1) fl.tstamp_beg = tstamp;
     generation_report report = {
-        .tstamp   = put::cycles::current(),
+        .tstamp   = tstamp,
         .gen_idx  = idx_,
         .flow_idx = fl.idx,
         .pkt_idx  = fl.pkt_idx,

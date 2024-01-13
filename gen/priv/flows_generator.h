@@ -27,12 +27,19 @@ public:
     // flow entry.
     struct flow
     {
+        // Member variables needed for the generation
         uint32_t idx;
         uint32_t pkt_idx;
         baio_ip_addr4 cln_ip_addr;
         baio_ip_addr4 srv_ip_addr;
         event_handle event;
         flows_generator* fgen;
+
+        // Member variables needed for the stats
+        uint64_t cnt_pkts;
+        uint64_t cnt_bytes;
+        put::cycles tstamp_beg;
+        put::cycles tstamp_end;
     };
 
 private:
@@ -87,6 +94,9 @@ public:
     flows_generator()                                  = delete;
     flows_generator(const flows_generator&)            = delete;
     flows_generator& operator=(const flows_generator&) = delete;
+
+    std::span<const flow> flows() const noexcept { return flows_; }
+    size_t idx() const noexcept { return idx_; }
 
 private:
     void setup_flow_events();

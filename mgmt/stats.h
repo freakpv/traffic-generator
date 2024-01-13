@@ -37,6 +37,7 @@ struct stats
 #undef TG_COUNTERS
 };
 
+// Stats send at the end when the generation is stopped.
 struct summary_stats
 {
     stats summary;

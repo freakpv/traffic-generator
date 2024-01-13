@@ -58,6 +58,9 @@ public:
 private:
     void on_inc_msg(mgmt::req_start_generation&&) noexcept;
     void on_inc_msg(mgmt::req_stop_generation&&) noexcept;
+    void on_inc_msg(mgmt::req_stats_report&&) noexcept;
+
+    static mgmt::stats get_eth_stats() noexcept;
 
     void stop_generation() noexcept;
     bool generation_started() const noexcept { return !!gen_cycles_; }
@@ -164,7 +167,7 @@ void manager_impl::on_inc_msg(mgmt::req_start_generation&& msg) noexcept
         return;
     }
 
-    // TODO: Debug log the prepared flows.
+    // TODO: Add debug log the prepared flows.
 
     TG_ENFORCE(generators_.empty());
     generators_ = std::move(gens);
@@ -196,24 +199,46 @@ void manager_impl::on_inc_msg(mgmt::req_stop_generation&&) noexcept
     // summary stats can be reported via the response.
     TG_LOG_INFO("Got request to stop generation\n");
 
+    std::vector<mgmt::summary_stats::entry> detailed;
+    for (const auto& gen : generators_) {
+        for (const auto& flow : gen.flows()) {
+            detailed.push_back({
+                .gen_idx   = gen.idx(),
+                .flow_idx  = flow.idx,
+                .cnt_pkts  = flow.cnt_pkts,
+                .cnt_bytes = flow.cnt_bytes,
+                .duration  = flow.tstamp_end - flow.tstamp_beg,
+            });
+        }
+    }
+
     stop_generation();
 
+    out_queue_->enqueue(mgmt::res_stop_generation{
+        .summary = get_eth_stats(), .detailed = std::move(detailed)});
+}
+
+void manager_impl::on_inc_msg(mgmt::req_stats_report&&) noexcept
+{
+    out_queue_->enqueue(mgmt::res_stats_report{.res = get_eth_stats()});
+}
+
+mgmt::stats manager_impl::get_eth_stats() noexcept
+{
     rte_eth_stats tmp = {};
     rte_eth_stats_get(nic_port_id, &tmp);
-
-    out_queue_->enqueue(
-        mgmt::res_stop_generation{.res = mgmt::summary_stats{
-                                      .cnt_rx_pkts        = tmp.ipackets,
-                                      .cnt_tx_pkts        = tmp.opackets,
-                                      .cnt_rx_bytes       = tmp.ibytes,
-                                      .cnt_tx_bytes       = tmp.obytes,
-                                      .cnt_rx_pkts_qfull  = tmp.imissed,
-                                      .cnt_rx_pkts_nombuf = tmp.rx_nombuf,
-                                      .cnt_tx_pkts_qfull  = cnt_tx_pkts_qfull_,
-                                      .cnt_tx_pkts_nombuf = cnt_tx_pkts_nombuf_,
-                                      .cnt_rx_pkts_err    = tmp.ierrors,
-                                      .cnt_tx_pkts_err    = tmp.oerrors,
-                                  }});
+    return {
+        .cnt_rx_pkts        = tmp.ipackets,
+        .cnt_tx_pkts        = tmp.opackets,
+        .cnt_rx_bytes       = tmp.ibytes,
+        .cnt_tx_bytes       = tmp.obytes,
+        .cnt_rx_pkts_qfull  = tmp.imissed,
+        .cnt_rx_pkts_nombuf = tmp.rx_nombuf,
+        .cnt_tx_pkts_qfull  = cnt_tx_pkts_qfull_,
+        .cnt_tx_pkts_nombuf = cnt_tx_pkts_nombuf_,
+        .cnt_rx_pkts_err    = tmp.ierrors,
+        .cnt_tx_pkts_err    = tmp.oerrors,
+    };
 }
 
 void manager_impl::stop_generation() noexcept
@@ -281,9 +306,29 @@ gen::priv::event_handle manager_impl::create_scheduler_event() noexcept
     return gen::priv::event_handle(&scheduler_);
 }
 
-void manager_impl::do_report(const gen::priv::generation_report&) noexcept
+void manager_impl::do_report(const gen::priv::generation_report& r) noexcept
 {
-    // TODO: Send the report to the management system
+    // There is some repeating work converting between
+    // gen::priv::generation_report and mgmt::generation_report.
+    // This work could have been avoided if we used single type but then we'll
+    // create additional inter-coupling between the `gen::priv` and `mgmt`
+    // modules. The idea of the current design is only the public functionality
+    // of the `gen` module to depend on `mgmt` module and the `priv` part to
+    // don't "know" about the `mgmt` types. The relationship between the `gen`
+    // and `mgmt` modules is designed to be in single direction but they can
+    // not be totally independent unless they both depend on another module
+    // which exposes the types needed for communication between them.
+    out_queue_->enqueue(mgmt::generation_report{
+        .tstamp   = r.tstamp,
+        .gen_idx  = r.gen_idx,
+        .flow_idx = r.flow_idx,
+        .pkt_idx  = r.pkt_idx,
+        .pkt_len  = r.pkt_len,
+        .src_addr = r.src_addr,
+        .dst_addr = r.dst_addr,
+        .from_cln = r.from_cln,
+        .ok       = r.ok,
+    });
 }
 
 ////////////////////////////////////////////////////////////////////////////////

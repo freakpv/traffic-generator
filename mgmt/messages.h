@@ -27,9 +27,13 @@ struct res_stop_generation
     bout::result<mgmt::summary_stats, std::string> res = mgmt::summary_stats{};
 };
 
-struct stats_report
+struct req_stats_report
 {
-    // TODO:
+};
+
+struct res_stats_report
+{
+    mgmt::stats res = {};
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,12 +75,19 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 struct out_messages_queue
-: messages_queue<4, req_start_generation, req_stop_generation>
+: messages_queue<32,
+                 req_start_generation,
+                 req_stop_generation,
+                 req_stats_report>
 {
 };
 
 struct inc_messages_queue
-: messages_queue<64, res_start_generation, res_stop_generation, stats_report>
+: messages_queue<256,
+                 res_start_generation,
+                 res_stop_generation,
+                 res_stats_report,
+                 generatio_report>
 {
 };
 
