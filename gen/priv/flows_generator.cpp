@@ -38,9 +38,10 @@ load_pkts(const flows_generator::config& cfg)
     if (ipg) ipg_tstamp = stdcr::microseconds{0};
     std::optional<stdcr::microseconds> prev_tstamp; // For the relative time
     auto alloc_mbuf = [ops = cfg.gen_ops] { return ops->alloc_mbuf(); };
-    for (gen::priv::tcap_loader tcap(cfg.cap_fpath); !tcap.is_eof();) {
+    for (gen::priv::tcap_loader tcap(cfg.cap_fpath);;) {
         auto res = tcap.load_pkt(alloc_mbuf);
         if (!res) {
+            if (tcap.is_eof()) break;
             put::throw_system_error(
                 res.error(), "Failed to load packet from {}", cfg.cap_fpath);
         }
