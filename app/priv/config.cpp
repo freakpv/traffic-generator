@@ -20,7 +20,7 @@ void validate(boost::any& out,
         put::throw_runtime_error("No port in endpoint: {}", val);
     }
     bsys::error_code ec;
-    const auto addr = baio::ip::make_address_v4(parts[1], ec);
+    const auto addr = baio::ip::make_address_v4(parts[0], ec);
     if (ec) {
         put::throw_runtime_error("Invalid address in endpoint: {}", val);
     }
@@ -110,7 +110,7 @@ fmt::format_context::iterator fmt::formatter<app::priv::config>::format(
     const app::priv::config& arg, fmt::format_context& ctx) const noexcept
 {
     auto it = ctx.out();
-    arg.opts_.visit([&it]<typename V>(std::string_view name, const V& val) {
+    arg.opts_.visit([&it](std::string_view name, const auto& val) {
         it = fmt::format_to(it, "\n\t{} = {}", name, val);
     });
     return it;
