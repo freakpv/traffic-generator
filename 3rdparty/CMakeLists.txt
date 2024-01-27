@@ -65,7 +65,7 @@ ExternalProject_Add_Step(
 ################################################################################
 # Boost Libraries
 
-set(BOOST_ARCHIVE "boost_1_83_0.tar.bz2")
+set(BOOST_ARCHIVE "boost_1_84_0.tar.bz2")
 set(BOOST_PREFIX_DIR "${3RD_PARTY_PREFIX_DIR}/boost")
 set(BOOST_BUILD_DIR "${BOOST_PREFIX_DIR}/build")
 set(BOOST_TARGET_DIR "${BOOST_PREFIX_DIR}/target")
@@ -73,9 +73,7 @@ ExternalProject_Add(
     boost
 
     URL 
-        "https://boostorg.jfrog.io/artifactory/main/release/1.83.0/source/${BOOST_ARCHIVE}"
-    URL_HASH 
-        "SHA256=6478edfe2f3305127cffe8caf73ea0176c53769f4bf1585be237eb30798c3b8e"
+        "https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/${BOOST_ARCHIVE}"
     DOWNLOAD_NO_EXTRACT TRUE
 
     PREFIX ${3RD_PARTY_PREFIX_DIR}
